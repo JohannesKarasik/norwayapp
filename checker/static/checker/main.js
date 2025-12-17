@@ -146,15 +146,24 @@
     const rect = error.getBoundingClientRect();
 
     tooltip.innerHTML = `
-      <div class="suggestion">${error.dataset.suggestion}</div>
-      <div class="actions">
-        <button class="apply">Apply</button>
-        <button class="dismiss">Dismiss</button>
-      </div>
-    `;
+    <div class="suggestion">${error.dataset.suggestion}</div>
+    <div class="actions">
+      <button class="apply">Tillämpa</button>
+      <button class="dismiss">Avvisa</button>
+    </div>
+  `;
+  
 
-    tooltip.style.top = `${rect.top + window.scrollY - 8}px`;
-    tooltip.style.left = `${rect.left + window.scrollX}px`;
+  const tooltipTop =
+  rect.top + window.scrollY + rect.height / 2;
+
+const tooltipLeft =
+  rect.left + window.scrollX + rect.width / 2;
+
+tooltip.style.top = `${tooltipTop}px`;
+tooltip.style.left = `${tooltipLeft}px`;
+tooltip.style.transform = "translate(-50%, -50%)";
+
     tooltip.classList.add("visible");
   });
 
