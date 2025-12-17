@@ -146,38 +146,27 @@
     const rect = error.getBoundingClientRect();
 
     tooltip.innerHTML = `
-    <div class="suggestion" style="new">${error.dataset.suggestion}</div>
+    <div class="suggestion">${error.dataset.suggestion}</div>
     <div class="actions">
       <button class="apply">Tillämpa</button>
       <button class="dismiss">Avvisa</button>
     </div>
-    <style>.margin-bottom:{ 100px !important}</style>
   `;
   
   tooltip.classList.add("visible");
 
   requestAnimationFrame(() => {
     const tooltipRect = tooltip.getBoundingClientRect();
-    const editorRect = editor.getBoundingClientRect();
+    const GAP = 12;
   
-    const GAP = 10;
-  
-    const top =
-      rect.top
-      - tooltipRect.height
-      - GAP
-      + window.scrollY
-      - editor.scrollTop;
-  
-    const left =
-      rect.left
-      + rect.width / 2
-      + window.scrollX;
+    const top = rect.top - tooltipRect.height - GAP;
+    const left = rect.left + rect.width / 2;
   
     tooltip.style.top = `${top}px`;
     tooltip.style.left = `${left}px`;
     tooltip.style.transform = "translateX(-50%)";
   });
+  
   
   
     tooltip.classList.add("visible");
