@@ -227,3 +227,10 @@
 }
 
 .tooltip-portal.visible{ display:block; }
+
+
+
+.site-header .logo img {
+  height: 64px;        /* prøv 64–72 */
+  max-height: none;
+}
