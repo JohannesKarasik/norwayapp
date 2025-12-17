@@ -153,18 +153,30 @@
     </div>
   `;
   
+  tooltip.classList.add("visible");
 
-  const GAP = 10; // distance between text and tooltip
-
-  const tooltipTop =
-    rect.top + window.scrollY - GAP;
+  /* wait for tooltip to render so height is known */
+  requestAnimationFrame(() => {
+    const tooltipRect = tooltip.getBoundingClientRect();
   
-  const tooltipLeft =
-    rect.left + window.scrollX + rect.width / 2;
+    const GAP = 8; // space between text and tooltip
   
-  tooltip.style.top = `${tooltipTop}px`;
-  tooltip.style.left = `${tooltipLeft}px`;
-  tooltip.style.transform = "translate(-50%, -100%)";
+    const top =
+      rect.top +
+      window.scrollY -
+      tooltipRect.height -
+      GAP;
+  
+    const left =
+      rect.left +
+      window.scrollX +
+      rect.width / 2;
+  
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.transform = "translateX(-50%)";
+  });
+  
   
     tooltip.classList.add("visible");
   });
