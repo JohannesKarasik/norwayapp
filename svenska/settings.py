@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-o_(@uoem2n4f^w@_*rxisgx%t-56m_xc$j8o*cr(_4x2^lu%+@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '209.38.202.27', 'rattatext.se', 'www.rattatext.se']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '64.23.135.75']
 
 
 
