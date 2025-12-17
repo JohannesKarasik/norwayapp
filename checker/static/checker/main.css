@@ -187,18 +187,19 @@
 }
 
 
-.editor .error {
+#text-editor .error {
   display: inline-block;
-  line-height: 1.55; /* must match editor */
+  line-height: 1.55; /* MUST match editor */
   cursor: pointer;
 
   background-color: rgba(239, 68, 68, 0.18);
   text-decoration: underline;
-  text-decoration-color: #ef4444 !important;
+  text-decoration-color: #ef4444;
   text-underline-offset: 3px;
   border-radius: 3px;
-  padding: 0 1px;
+  padding: 0 2px;
 }
+
 
 
 
