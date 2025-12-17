@@ -154,16 +154,18 @@
   `;
   
 
+  const GAP = 10; // distance between text and tooltip
+
   const tooltipTop =
-  rect.top + window.scrollY + rect.height / 2;
-
-const tooltipLeft =
-  rect.left + window.scrollX + rect.width / 2;
-
-tooltip.style.top = `${tooltipTop}px`;
-tooltip.style.left = `${tooltipLeft}px`;
-tooltip.style.transform = "translate(-50%, -50%)";
-
+    rect.top + window.scrollY - GAP;
+  
+  const tooltipLeft =
+    rect.left + window.scrollX + rect.width / 2;
+  
+  tooltip.style.top = `${tooltipTop}px`;
+  tooltip.style.left = `${tooltipLeft}px`;
+  tooltip.style.transform = "translate(-50%, -100%)";
+  
     tooltip.classList.add("visible");
   });
 
