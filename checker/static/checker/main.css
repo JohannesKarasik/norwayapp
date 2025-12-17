@@ -194,7 +194,7 @@
 
   background-color: rgba(239, 68, 68, 0.18);
   text-decoration: underline;
-  text-decoration-color: #ef4444;
+  text-decoration-color: #ef4444 !important;
   text-underline-offset: 3px;
   border-radius: 3px;
   padding: 0 1px;
