@@ -155,22 +155,23 @@
   
   tooltip.classList.add("visible");
 
-  /* wait for tooltip to render so height is known */
   requestAnimationFrame(() => {
     const tooltipRect = tooltip.getBoundingClientRect();
+    const editorRect = editor.getBoundingClientRect();
   
-    const GAP = 8; // space between text and tooltip
+    const GAP = 10;
   
     const top =
-      rect.top +
-      window.scrollY -
-      tooltipRect.height -
-      GAP;
+      rect.top
+      - tooltipRect.height
+      - GAP
+      + window.scrollY
+      - editor.scrollTop;
   
     const left =
-      rect.left +
-      window.scrollX +
-      rect.width / 2;
+      rect.left
+      + rect.width / 2
+      + window.scrollX;
   
     tooltip.style.top = `${top}px`;
     tooltip.style.left = `${left}px`;
