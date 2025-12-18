@@ -22,7 +22,7 @@
 
 
  <div class="wrap">
-   <main class="card" id="korr" style="align-items: center; justify-content: center;">
+   <main class="card" id="korr">
 
 
      <div class="card__body">
@@ -235,341 +235,310 @@
 
 
 <style>
- /* Modal sizing */
-/* Center modal vertically + horizontally */
-.modal{
- position: fixed;
- inset: 0;
- display: none;        /* hidden by default */
- z-index: 1000;
- padding: 24px;
-}
-
-
-.modal.active{
- display: flex;        /* ONLY show when active */
- align-items: center;
- justify-content: center;
-}
-
-
-
-
-/* Make overlay cover full screen behind content */
-.modal__overlay{
- position: absolute;
- inset: 0;
- background: rgba(0,0,0,.45);
- backdrop-filter: blur(3px);
-}
-
-
-/* Your sizing stays, just remove any margin-based centering */
-.modal__content{
- position: relative;
- max-width: 560px;
- width: 100%;
- padding: 30px 32px;
- border-radius: 16px;
- background: #fff;
- box-shadow: 0 20px 40px rgba(0,0,0,.2);
-}
-
-
-/* Center modal title + subtitle */
-.modal__content h2,
-.modal__content .sub{
- text-align: center;
-
-
-
-
-
-
-}
-
-
-.sub{
- margin-bottom: 30px;
-}
-
-
-.subheading{
- margin-bottom: 0px;
-}
-
-
-
-
-/* Layout */
-.auth-form{
- display:flex;
- flex-direction:column;
- align-items:center;
- gap: 20px;
-}
-
-
-/* spacing BETWEEN fields only */
-.auth-fields{
- display:flex;
- flex-direction:column;
- gap:14px;                 /* field spacing */
- width:100%;
- align-items:center;
-}
-
-
-/* spacing BETWEEN buttons only */
-.auth-actions{
- display:flex;
- flex-direction:column;
- gap:8px;                  /* button spacing */
- margin-top:14px;          /* gap between fields and buttons */
- width:100%;
- align-items:center;
-}
-
-
-/* shared width */
-.auth-fields input,
-.auth-actions .btn{
- width:450px;
- max-width:100%;
-}
-
-
-/* ✅ Modern input styling */
-.auth-fields input{
- appearance:none;
- -webkit-appearance:none;
-
-
- height:46px;
- padding:0 14px;
-
-
- border:1.5px solid #cbd5e1; /* clearer border */
- border-radius:12px;
-
-
- background:#f9fafb;
- color:var(--text);
-
-
- font-size:15px;
- line-height:1;
-
-
- outline:none;
- transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
-}
-
-
-.auth-fields input::placeholder{
- color:#6b7280;  /* darker / clearer placeholder */
- opacity: 1;     /* ensures full strength on some browsers */
-}
-
-
-
-
-.auth-fields input:focus{
- background:#fff;
- border-color: color-mix(in oklab, var(--accent), #fff 30%);
- box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-}
-
-
-/* Optional: nicer autofill */
-.auth-fields input:-webkit-autofill{
- -webkit-text-fill-color: var(--text);
- box-shadow: 0 0 0 1000px #f9fafb inset;
- transition: background-color 9999s ease-out 0s;
-}
-.auth-fields input:-webkit-autofill:focus{
- box-shadow:
-   0 0 0 1000px #fff inset,
-   0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-}
-
-
-/* Keep your modal buttons clean (no bottom "stripe") */
-.modal .btn--primary{
- box-shadow:none;
-}
-
-
-
-
-.modal__close{
- position:absolute;
- top:14px;
- right:14px;              /* ✅ right side of modal */
- width:38px;
- height:38px;
- display:grid;
- place-items:center;
-
-
- border:1px solid #e5e7eb;
- border-radius:999px;
- background:rgba(249,250,251,.95);
-
-
- color:#111827;
- font-size:18px;
- line-height:1;
- cursor:pointer;
-
-
- transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .02s ease;
-}
-
-
-.modal__close:hover{
- background:#fff;
- border-color:#cbd5e1;
- box-shadow:0 8px 20px rgba(17,24,39,.12);
-}
-
-
-.modal__close:active{
- transform:translateY(1px);
-}
-
-
-.modal__close:focus-visible{
- outline:none;
- box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
- border-color: color-mix(in oklab, var(--accent), #fff 30%);
-}
-
-
-
-
-.auth-link{
- background:none;
- border:none;
- padding:0;
- margin-top:10px;
-
-
- color: var(--accent);
- font-weight:600;
- font-size:14px;
- line-height:1.2;
-
-
- cursor:pointer;
- text-decoration:none;
- transition: opacity .15s ease, transform .02s ease;
-}
-
-
-.auth-link:hover{
- text-decoration:underline;
- text-underline-offset:3px;
-}
-
-
-.auth-link:active{
- transform:translateY(1px);
-}
-
-
-.auth-link:focus-visible{
- outline:none;
- box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
- border-radius:8px;
- padding:4px 8px; /* gives the focus ring some area */
- margin-top:6px;
-}
-
-
-.seo.seo--rich{
-  margin-top: 8px;
-  padding-top: 6px;
-  color: var(--text);
-}
-
-.seo.seo--rich h2{
-  margin: 0 0 10px;
-  font-size: 1.25rem;
-  letter-spacing: .2px;
-}
-
-.seo.seo--rich h3{
-  margin: 18px 0 8px;
-  font-size: 1.05rem;
-  letter-spacing: .15px;
-}
-
-.seo.seo--rich p{
-  margin: 10px 0;
-  color: var(--text);
-  max-width: 80ch;
-}
-
-.seo.seo--rich ul{
-  margin: 10px 0 12px;
-  padding-left: 18px;
-  display: grid;
-  gap: 8px;
-  max-width: 80ch;
-}
-
-.seo.seo--rich li{
-  color: var(--text);
-}
-
-.seo-checklist{
-  list-style: none;
-  padding-left: 0;
-}
-
-.seo-checklist li{
-  position: relative;
-  padding-left: 26px;
-}
-
-.seo-checklist li::before{
-  content: "✓";
+  /* Modal sizing */
+ /* Center modal vertically + horizontally */
+ .modal{
+  position: fixed;
+  inset: 0;
+  display: none;        /* hidden by default */
+  z-index: 1000;
+  padding: 24px;
+ }
+ 
+ 
+ .modal.active{
+  display: flex;        /* ONLY show when active */
+  align-items: center;
+  justify-content: center;
+ }
+ 
+ 
+ 
+ 
+ /* Make overlay cover full screen behind content */
+ .modal__overlay{
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+ }
+ 
+ 
+ /* Your sizing stays, just remove any margin-based centering */
+ .modal__content{
+  position: relative;
+  max-width: 560px;
+  width: 100%;
+  padding: 30px 32px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 40px rgba(0,0,0,.2);
+ }
+ 
+ 
+ /* Center modal title + subtitle */
+ .modal__content h2,
+ .modal__content .sub{
+  text-align: center;
+ }
+ 
+ 
+ .sub{
+  margin-bottom: 30px;
+ }
+ 
+ 
+ .subheading{
+  margin-bottom: 0px;
+ }
+ 
+ 
+ /* Layout */
+ .auth-form{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 20px;
+ }
+ 
+ 
+ /* spacing BETWEEN fields only */
+ .auth-fields{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  width:100%;
+  align-items:center;
+ }
+ 
+ 
+ /* spacing BETWEEN buttons only */
+ .auth-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:14px;
+  width:100%;
+  align-items:center;
+ }
+ 
+ 
+ /* shared width */
+ .auth-fields input,
+ .auth-actions .btn{
+  width:450px;
+  max-width:100%;
+ }
+ 
+ 
+ /* ✅ Modern input styling */
+ .auth-fields input{
+  appearance:none;
+  -webkit-appearance:none;
+  height:46px;
+  padding:0 14px;
+  border:1.5px solid #cbd5e1;
+  border-radius:12px;
+  background:#f9fafb;
+  color:var(--text);
+  font-size:15px;
+  line-height:1;
+  outline:none;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+ }
+ 
+ 
+ .auth-fields input::placeholder{
+  color:#6b7280;
+  opacity: 1;
+ }
+ 
+ 
+ .auth-fields input:focus{
+  background:#fff;
+  border-color: color-mix(in oklab, var(--accent), #fff 30%);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+ }
+ 
+ 
+ /* Optional: nicer autofill */
+ .auth-fields input:-webkit-autofill{
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 1000px #f9fafb inset;
+  transition: background-color 9999s ease-out 0s;
+ }
+ .auth-fields input:-webkit-autofill:focus{
+  box-shadow:
+    0 0 0 1000px #fff inset,
+    0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+ }
+ 
+ 
+ /* Keep your modal buttons clean (no bottom "stripe") */
+ .modal .btn--primary{
+  box-shadow:none;
+ }
+ 
+ 
+ .modal__close{
+  position:absolute;
+  top:14px;
+  right:14px;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid #e5e7eb;
+  border-radius:999px;
+  background:rgba(249,250,251,.95);
+  color:#111827;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .02s ease;
+ }
+ 
+ 
+ .modal__close:hover{
+  background:#fff;
+  border-color:#cbd5e1;
+  box-shadow:0 8px 20px rgba(17,24,39,.12);
+ }
+ 
+ 
+ .modal__close:active{
+  transform:translateY(1px);
+ }
+ 
+ 
+ .modal__close:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+  border-color: color-mix(in oklab, var(--accent), #fff 30%);
+ }
+ 
+ 
+ .auth-link{
+  background:none;
+  border:none;
+  padding:0;
+  margin-top:10px;
   color: var(--accent);
-  font-weight: 800;
-}
-
-.seo-tool-slot{
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px dashed color-mix(in oklab, var(--accent), var(--border) 55%);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--accent), #fff 92%);
-  color: color-mix(in oklab, var(--accent), #000 35%);
-  font-weight: 600;
-  max-width: 80ch;
-}
-
-
-#text-editor .error {
-  display: inline-block;   /* ← REQUIRED for contenteditable */
-  
-  cursor: pointer;
-  border-radius: 3px;
-  padding: 0 2px;
-
-  background: rgba(239, 68, 68, 0.18);
-  box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.95);
-
-  text-decoration: none;
-}
-
-
-
-</style>
+  font-weight:600;
+  font-size:14px;
+  line-height:1.2;
+  cursor:pointer;
+  text-decoration:none;
+  transition: opacity .15s ease, transform .02s ease;
+ }
+ 
+ 
+ .auth-link:hover{
+  text-decoration:underline;
+  text-underline-offset:3px;
+ }
+ 
+ 
+ .auth-link:active{
+  transform:translateY(1px);
+ }
+ 
+ 
+ .auth-link:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+  border-radius:8px;
+  padding:4px 8px;
+  margin-top:6px;
+ }
+ 
+ 
+ .seo.seo--rich{
+   margin-top: 8px;
+   padding-top: 6px;
+   color: var(--text);
+ }
+ 
+ .seo.seo--rich h2{
+   margin: 0 0 10px;
+   font-size: 1.25rem;
+   letter-spacing: .2px;
+ }
+ 
+ .seo.seo--rich h3{
+   margin: 18px 0 8px;
+   font-size: 1.05rem;
+   letter-spacing: .15px;
+ }
+ 
+ .seo.seo--rich p{
+   margin: 10px 0;
+   color: var(--text);
+   max-width: 80ch;
+ }
+ 
+ .seo.seo--rich ul{
+   margin: 10px 0 12px;
+   padding-left: 18px;
+   display: grid;
+   gap: 8px;
+   max-width: 80ch;
+ }
+ 
+ .seo.seo--rich li{
+   color: var(--text);
+ }
+ 
+ .seo-checklist{
+   list-style: none;
+   padding-left: 0;
+ }
+ 
+ .seo-checklist li{
+   position: relative;
+   padding-left: 26px;
+ }
+ 
+ .seo-checklist li::before{
+   content: "✓";
+   position: absolute;
+   left: 0;
+   top: 0;
+   color: var(--accent);
+   font-weight: 800;
+ }
+ 
+ .seo-tool-slot{
+   margin-top: 14px;
+   padding: 12px 14px;
+   border: 1px dashed color-mix(in oklab, var(--accent), var(--border) 55%);
+   border-radius: 12px;
+   background: color-mix(in oklab, var(--accent), #fff 92%);
+   color: color-mix(in oklab, var(--accent), #000 35%);
+   font-weight: 600;
+   max-width: 80ch;
+ }
+ 
+ 
+ #text-editor .error {
+   display: inline-block;
+   cursor: pointer;
+   border-radius: 3px;
+   padding: 0 2px;
+   background: rgba(239, 68, 68, 0.18);
+   box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.95);
+   text-decoration: none;
+ }
+ 
+ 
+ /* --- FORCE MAIN CONTENT CENTERING (SAFE, NON-DESTRUCTIVE) --- */
+ main,
+ main > .wrap,
+ body > .wrap{
+   margin-inline: auto;
+ }
+ </style>
+ 
 
 
 <script src="{% static 'checker/main.js' %}"></script>
