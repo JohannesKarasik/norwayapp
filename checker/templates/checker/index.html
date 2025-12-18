@@ -799,9 +799,16 @@
   console.log("tc tooltip ref:", tooltip);
 
   editor.addEventListener("click", (e) => {
-    console.log("🖱️ Editor clicked:", e.target);
-    const error = e.target.closest(".error");
-    if (!error) return;
+
+// 🚫 DO NOT reopen tooltip if click came from tooltip itself
+if (e.target.closest(".tooltip-portal")) {
+  return;
+}
+
+console.log("🖱️ Editor clicked:", e.target);
+const error = e.target.closest(".error");
+if (!error) return;
+
   
     activeError = error;
     console.log("❗ Active error set:", activeError, {
