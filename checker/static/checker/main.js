@@ -151,8 +151,8 @@
     tooltip.innerHTML = `
       <div class="suggestion">${error.dataset.suggestion}</div>
       <div class="actions">
-        <button class="apply">Tillämpa</button>
-        <button class="dismiss">Avvisa</button>
+        <button type="button" class="apply">Tillämpa</button>
+        <button type="button" class="dismiss">Avvisa</button>
       </div>
     `;
   
@@ -189,45 +189,48 @@
     tooltip.style.visibility = "visible";
     tooltip.classList.add("visible");
   });
-  
-
 
   /* -------------------------------
-   APPLY / DISMISS (INSIDE IIFE)
---------------------------------*/
-tooltip.addEventListener("click", (e) => {
-  if (!activeError) return;
+     APPLY / DISMISS (INSIDE IIFE)
+  --------------------------------*/
+  // Use CAPTURE so it works even if other handlers stop propagation
+  tooltip.addEventListener("click", (e) => {
+    const applyBtn = e.target.closest(".apply");
+    const dismissBtn = e.target.closest(".dismiss");
+    if (!applyBtn && !dismissBtn) return;
 
-  // ✅ APPLY
-  if (e.target.classList.contains("apply")) {
-    const suggestion = activeError.dataset.suggestion;
+    // Prevent any default button behavior
+    e.preventDefault();
+    e.stopPropagation();
 
-    // Replace highlighted span with corrected text
-    activeError.replaceWith(document.createTextNode(suggestion));
+    if (!activeError) return;
 
-    // Sync state
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
+    if (applyBtn) {
+      const suggestion = activeError.dataset.suggestion || "";
+      activeError.replaceWith(document.createTextNode(suggestion));
 
-    tooltip.classList.remove("visible");
-    activeError = null;
-  }
+      lastPlainText = getPlainText();
+      sessionStorage.setItem("tc_text", lastPlainText);
+      updateCounts(lastPlainText);
 
-  // ❌ DISMISS
-  if (e.target.classList.contains("dismiss")) {
-    const original = activeError.dataset.original;
+      tooltip.classList.remove("visible");
+      activeError = null;
+      return;
+    }
 
-    activeError.replaceWith(document.createTextNode(original));
+    if (dismissBtn) {
+      const original = activeError.dataset.original || "";
+      activeError.replaceWith(document.createTextNode(original));
 
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
+      lastPlainText = getPlainText();
+      sessionStorage.setItem("tc_text", lastPlainText);
+      updateCounts(lastPlainText);
 
-    tooltip.classList.remove("visible");
-    activeError = null;
-  }
-});
+      tooltip.classList.remove("visible");
+      activeError = null;
+      return;
+    }
+  }, true);
 
   /* -------------------------------
      INIT
@@ -341,4 +344,3 @@ tooltip.addEventListener("click", (e) => {
 
 
 })();
-
