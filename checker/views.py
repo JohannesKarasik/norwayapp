@@ -12,13 +12,27 @@ logger = logging.getLogger(__name__)
 
 
 def correct_with_openai_sv(text: str) -> str:
+    """
+    Returns a corrected version of the text where:
+    - NO words are added or removed
+    - Word order is identical
+    - Only spelling and punctuation attached to a word may change
+    """
     try:
         system_prompt = (
-            "Du er en profesjonell norsk språkre­daktør. "
-            "Din oppgave er å korrigere ALLE feil i rettskriving, grammatikk, "
-            "ordstilling og tegnsetting (spesielt komma). "
-            "Behold betydningen nøyaktig. "
-            "Returner KUN den korrigerte teksten."
+            "Du er en profesjonell norsk språkre­daktør.\n\n"
+            "VIKTIGE REGLER (MÅ FØLGES):\n"
+            "- IKKE legg til nye ord\n"
+            "- IKKE fjern ord\n"
+            "- IKKE endre rekkefølgen på ord\n"
+            "- IKKE del eller slå sammen ord\n"
+            "- IKKE endre mellomrom eller linjeskift\n\n"
+            "Du har KUN lov til å:\n"
+            "- rette stavefeil INNE I et eksisterende ord\n"
+            "- legge til eller fjerne tegnsetting SOM EN DEL AV ORDET "
+            "(f.eks. 'att' → 'att,')\n\n"
+            "Hvis en feil krever omskriving, LA DEN STÅ URØRT.\n\n"
+            "Returner KUN teksten, uten forklaring."
         )
 
         resp = client.chat.completions.create(
@@ -31,6 +45,12 @@ def correct_with_openai_sv(text: str) -> str:
         )
 
         corrected = (resp.choices[0].message.content or "").strip()
+
+        # HARD SAFETY: word count must match exactly
+        if len(corrected.split()) != len(text.split()):
+            logger.warning("Word count mismatch – falling back to original text")
+            return text
+
         return corrected if corrected else text
 
     except Exception:
@@ -40,29 +60,26 @@ def correct_with_openai_sv(text: str) -> str:
 
 def find_differences_charwise(original: str, corrected: str):
     """
-    Token-level diff with alignment.
-    Highlights small, local corrections (spelling, commas),
-    ignores large rewrites / reordering.
+    Token-level diff where:
+    - punctuation is part of the word token
+    - ONLY 1-to-1 token replacements are allowed
+    - no inserts / deletes / reorders are surfaced
     """
 
     diffs_out = []
 
-    # Normalize unicode (æ/ø/å etc.)
     orig_text = unicodedata.normalize("NFC", original)
     corr_text = unicodedata.normalize("NFC", corrected)
 
-    def merge_punctuation(tokens):
-        merged = []
-        for tok in tokens:
-            if merged and re.match(r"^[,.:;!?]$", tok):
-                merged[-1] += tok
-            else:
-                merged.append(tok)
-        return merged
+    # Token = word WITH optional attached punctuation
+    token_pattern = r"\w+[.,;:!?]?"
 
-    # Tokenize
-    orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
-    corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
+    orig_tokens = re.findall(token_pattern, orig_text, re.UNICODE)
+    corr_tokens = re.findall(token_pattern, corr_text, re.UNICODE)
+
+    # Absolute safety: token count must match
+    if len(orig_tokens) != len(corr_tokens):
+        return []
 
     # Map original tokens to char positions
     orig_positions = []
@@ -73,71 +90,34 @@ def find_differences_charwise(original: str, corrected: str):
         orig_positions.append((start, end))
         cursor = end
 
-    def span_for_range(i_start, i_end):
-        if i_start >= len(orig_positions):
-            return len(orig_text), len(orig_text)
-        if i_start == i_end:
-            start, _ = orig_positions[i_start]
-            return start, start
-        start = orig_positions[i_start][0]
-        end = orig_positions[i_end - 1][1]
-        return start, end
+    def is_small_edit(a: str, b: str) -> bool:
+        a_core = a.lower().strip(".,;:!?")
+        b_core = b.lower().strip(".,;:!?")
 
-    def tokens_are_small_edit(a, b):
-        a_low = a.lower().strip(",.;:!?")
-        b_low = b.lower().strip(",.;:!?")
-        if a_low == b_low:
+        if a_core == b_core:
             return True
-        return difflib.SequenceMatcher(a=a_low, b=b_low).ratio() >= 0.6
 
-    def is_pure_punctuation(tok):
-        return bool(re.fullmatch(r"[,.:;!?]+", tok))
+        # allow small spelling fixes only
+        ratio = difflib.SequenceMatcher(a=a_core, b=b_core).ratio()
+        return ratio >= 0.8
 
-    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
-
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
+    for i, (orig_tok, corr_tok) in enumerate(zip(orig_tokens, corr_tokens)):
+        if orig_tok == corr_tok:
             continue
 
-        if tag == "replace":
-            if (i2 - i1) == 1 and (j2 - j1) == 1:
-                orig_tok = orig_tokens[i1]
-                corr_tok = corr_tokens[j1]
-                if tokens_are_small_edit(orig_tok, corr_tok):
-                    start, end = span_for_range(i1, i2)
-                    diffs_out.append({
-                        "type": "replace",
-                        "start": start,
-                        "end": end,
-                        "original": orig_tok,
-                        "suggestion": corr_tok,
-                    })
+        if not is_small_edit(orig_tok, corr_tok):
+            # ignore semantic rewrites
+            continue
 
-        elif tag == "delete":
-            if (i2 - i1) == 1:
-                orig_tok = orig_tokens[i1]
-                if is_pure_punctuation(orig_tok) or len(orig_tok) <= 2:
-                    start, end = span_for_range(i1, i2)
-                    diffs_out.append({
-                        "type": "delete",
-                        "start": start,
-                        "end": end,
-                        "original": orig_tok,
-                        "suggestion": "",
-                    })
+        start, end = orig_positions[i]
 
-        elif tag == "insert":
-            if (j2 - j1) == 1:
-                corr_tok = corr_tokens[j1]
-                if is_pure_punctuation(corr_tok):
-                    start, _ = span_for_range(i1, i1)
-                    diffs_out.append({
-                        "type": "insert",
-                        "start": start,
-                        "end": start,
-                        "original": "",
-                        "suggestion": corr_tok,
-                    })
+        diffs_out.append({
+            "type": "replace",
+            "start": start,
+            "end": end,
+            "original": orig_tok,
+            "suggestion": corr_tok,
+        })
 
     return diffs_out
 
@@ -165,7 +145,6 @@ def index(request):
             "error_count": len(differences),
         })
 
-    # Normal page render (GET)
     return render(request, "checker/index.html")
 
 
