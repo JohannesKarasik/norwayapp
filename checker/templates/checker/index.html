@@ -576,7 +576,6 @@
  
 
 
-<script src="{% static 'checker/main.js' %}"></script>
 <script>
   // Login modal
   const authModal = document.getElementById("auth-modal");
@@ -770,11 +769,18 @@
       return html;
     }
   
-    const tooltip = document.createElement("div");
-    tooltip.className = "tooltip-portal";
-    tooltip.id = "tc-tooltip";
-    document.body.appendChild(tooltip);
-    window.__tcTooltip = tooltip;
+    let tooltip = document.querySelector(".tooltip-portal");
+
+if (!tooltip) {
+  tooltip = document.createElement("div");
+  tooltip.className = "tooltip-portal";
+  tooltip.id = "tc-tooltip";
+  document.body.appendChild(tooltip);
+}
+
+window.__tcTooltip = tooltip;
+console.log("🧪 TOOLTIP IN USE:", tooltip);
+
   
     console.log("🧪 TOOLTIP CREATED:", tooltip);
   
