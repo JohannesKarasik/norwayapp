@@ -107,12 +107,13 @@
         <hr>
       
         <h2>Hvorfor velge Rettskriving Sjekk?</h2>
-        <ul>
-          <li>✅ <strong>Gratis og tilgjengelig</strong>: Ingen registrering, ingen betaling</li>
-          <li>✅ <strong>Rask og enkel å bruke</strong>: Lim inn teksten og se resultatene umiddelbart</li>
-          <li>✅ <strong>Bygget for norsk</strong>: Spesielt utviklet for norsk grammatikk og rettskriving</li>
-          <li>✅ <strong>AI-drevet teknologi</strong>: Bruker avansert algoritme for presis korreksjon</li>
+        <ul class="feature-list">
+          <li><span class="check"></span><strong>Gratis og tilgjengelig</strong>: Ingen registrering, ingen betaling</li>
+          <li><span class="check"></span><strong>Rask og enkel å bruke</strong>: Lim inn teksten og se resultatene umiddelbart</li>
+          <li><span class="check"></span><strong>Bygget for norsk</strong>: Spesielt utviklet for norsk grammatikk og rettskriving</li>
+          <li><span class="check"></span><strong>AI-drevet teknologi</strong>: Bruker avansert algoritme for presis korreksjon</li>
         </ul>
+        
       
         <hr>
       
@@ -530,6 +531,41 @@
    text-decoration: none;
  }
  
+
+ .feature-list {
+  list-style: none;
+  padding: 0;
+}
+
+.feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.feature-list .check {
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: #16a34a; /* grønn */
+  position: relative;
+  flex-shrink: 0;
+}
+
+.feature-list .check::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
  
  /* --- FORCE MAIN CONTENT CENTERING (SAFE, NON-DESTRUCTIVE) --- */
  main,
