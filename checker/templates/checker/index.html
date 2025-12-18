@@ -648,7 +648,7 @@
  </script>
  
  <script>
-   (function () {
+  (function () {
    console.log("✅ main.js loaded");
    document.addEventListener("click", (e) => {
      console.log("🌍 GLOBAL CLICK:", e.target);
@@ -801,12 +801,18 @@
  
  
    function hideTooltip() {
-   tooltip.classList.remove("visible");
-   tooltip.style.display = "none";
-   tooltip.style.visibility = "hidden";
-   tooltip.innerHTML = "";
-   activeError = null;
- }
+     tooltip.classList.remove("visible");
+     tooltip.setAttribute("aria-hidden", "true");
+     tooltip.innerHTML = "";
+ 
+     // hard-force hide (beats any CSS that keeps it visible)
+     tooltip.style.setProperty("display", "none", "important");
+     tooltip.style.setProperty("visibility", "hidden", "important");
+     tooltip.style.setProperty("opacity", "0", "important");
+     tooltip.style.setProperty("pointer-events", "none", "important");
+ 
+     activeError = null;
+   }
  
    editor.addEventListener("click", (e) => {
      console.log("🖱️ Editor clicked:", e.target);
@@ -828,9 +834,13 @@
        </div>
      `;
    
+     tooltip.setAttribute("aria-hidden", "false");
+ 
      // 2️⃣ Force render (hidden) so dimensions are REAL
+     tooltip.style.setProperty("display", "block", "important");
+     tooltip.style.setProperty("pointer-events", "auto", "important");
      tooltip.style.visibility = "hidden";
-     tooltip.style.display = "block";
+     tooltip.style.opacity = "1";
      tooltip.style.left = "0px";
      tooltip.style.top = "0px";
      tooltip.style.transform = "none";
@@ -1005,4 +1015,3 @@
  })();
  
  </script>
- 
