@@ -147,7 +147,7 @@
   tooltip.id = "tc-tooltip";
   window.__tcTooltip = tooltip;
   console.log("tc tooltip ref:", tooltip);
-  
+
   editor.addEventListener("click", (e) => {
     console.log("🖱️ Editor clicked:", e.target);
     const error = e.target.closest(".error");
@@ -205,39 +205,31 @@
   /* -------------------------------
      APPLY / DISMISS (WORKING)
   --------------------------------*/
-  tooltip.addEventListener("click", (e) => {
-    console.log("🔥 Tooltip CLICK detected:", e.target);
-    const applyBtn = e.target.closest(".apply");
-    const dismissBtn = e.target.closest(".dismiss");
-    console.log("➡ applyBtn:", applyBtn);
-    console.log("➡ dismissBtn:", dismissBtn);
-    if (!applyBtn && !dismissBtn) return;
+document.addEventListener("click", (e) => {
+  const applyBtn = e.target.closest(".tooltip-portal .apply");
+  const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
+  if (!applyBtn && !dismissBtn) return;
 
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
-    console.log("📌 activeError at click time:", activeError);
+  if (!activeError) return;
 
-    if (!activeError) return;
+  if (applyBtn) {
+    const suggestion = activeError.dataset.suggestion || "";
+    activeError.replaceWith(document.createTextNode(suggestion));
+  } else {
+    const original = activeError.dataset.original || "";
+    activeError.replaceWith(document.createTextNode(original));
+  }
 
-    if (applyBtn) {
-      const suggestion = activeError.dataset.suggestion || "";
-      console.log("✅ APPLY clicked — replacing with:", suggestion);
-      activeError.replaceWith(document.createTextNode(suggestion));
-    }
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
 
-    if (dismissBtn) {
-      const original = activeError.dataset.original || "";
-      activeError.replaceWith(document.createTextNode(original));
-    }
-
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
-
-    tooltip.classList.remove("visible");
-    activeError = null;
-  });
+  document.querySelector(".tooltip-portal")?.classList.remove("visible");
+  activeError = null;
+}, true);
 
   
   /* -------------------------------
