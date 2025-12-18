@@ -19,8 +19,8 @@
   /* Layout */
   .wrap{
     max-width:1100px;
-
-
+    margin-inline:auto;
+    padding:32px;
   }
 
   .site-header .wrap--header{
@@ -236,5 +236,5 @@
 }
 
 .site-header {
-  height: 72px !important;
+  height: 72px;
 }
