@@ -146,6 +146,8 @@
     if (!error) return;
   
     activeError = error;
+    tooltip._target = error;
+
   
     // 1️⃣ Inject tooltip content
     tooltip.innerHTML = `
@@ -194,43 +196,46 @@
      APPLY / DISMISS (INSIDE IIFE)
   --------------------------------*/
   // Use CAPTURE so it works even if other handlers stop propagation
-  tooltip.addEventListener("click", (e) => {
-    const applyBtn = e.target.closest(".apply");
-    const dismissBtn = e.target.closest(".dismiss");
-    if (!applyBtn && !dismissBtn) return;
+/* -------------------------------
+   APPLY / DISMISS (INSIDE IIFE)
+--------------------------------*/
+tooltip.addEventListener("click", (e) => {
+  const applyBtn = e.target.closest(".apply");
+  const dismissBtn = e.target.closest(".dismiss");
+  if (!applyBtn && !dismissBtn) return;
 
-    // Prevent any default button behavior
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
-    if (!activeError) return;
+  // Use the tooltip-stored target (set when opening tooltip)
+  const target = tooltip._target;
 
-    if (applyBtn) {
-      const suggestion = activeError.dataset.suggestion || "";
-      activeError.replaceWith(document.createTextNode(suggestion));
+  if (!target || !target.isConnected) {
+    // If target is gone, just close tooltip (prevents "does nothing" confusion)
+    tooltip.classList.remove("visible");
+    tooltip._target = null;
+    activeError = null;
+    return;
+  }
 
-      lastPlainText = getPlainText();
-      sessionStorage.setItem("tc_text", lastPlainText);
-      updateCounts(lastPlainText);
+  if (applyBtn) {
+    const suggestion = target.dataset.suggestion || "";
+    target.replaceWith(document.createTextNode(suggestion));
+  }
 
-      tooltip.classList.remove("visible");
-      activeError = null;
-      return;
-    }
+  if (dismissBtn) {
+    const original = target.dataset.original || "";
+    target.replaceWith(document.createTextNode(original));
+  }
 
-    if (dismissBtn) {
-      const original = activeError.dataset.original || "";
-      activeError.replaceWith(document.createTextNode(original));
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
 
-      lastPlainText = getPlainText();
-      sessionStorage.setItem("tc_text", lastPlainText);
-      updateCounts(lastPlainText);
-
-      tooltip.classList.remove("visible");
-      activeError = null;
-      return;
-    }
-  }, true);
+  tooltip.classList.remove("visible");
+  tooltip._target = null;
+  activeError = null;
+}, true);
 
   /* -------------------------------
      INIT
