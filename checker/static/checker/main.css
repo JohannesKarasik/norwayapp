@@ -237,3 +237,8 @@
 .site-header {
   height: 72px;
 }
+
+
+.tooltip-portal {
+  pointer-events: auto !important;
+}
