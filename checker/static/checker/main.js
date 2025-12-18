@@ -146,15 +146,13 @@
     if (!error) return;
   
     activeError = error;
-    tooltip._target = error;
-
   
     // 1️⃣ Inject tooltip content
     tooltip.innerHTML = `
       <div class="suggestion">${error.dataset.suggestion}</div>
       <div class="actions">
-        <button type="button" class="apply">Tillämpa</button>
-        <button type="button" class="dismiss">Avvisa</button>
+        <button class="apply">Tillämpa</button>
+        <button class="dismiss">Avvisa</button>
       </div>
     `;
   
@@ -191,52 +189,7 @@
     tooltip.style.visibility = "visible";
     tooltip.classList.add("visible");
   });
-
-  /* -------------------------------
-     APPLY / DISMISS (INSIDE IIFE)
-  --------------------------------*/
-  // Use CAPTURE so it works even if other handlers stop propagation
-/* -------------------------------
-   APPLY / DISMISS (INSIDE IIFE)
---------------------------------*/
-tooltip.addEventListener("click", (e) => {
-  const applyBtn = e.target.closest(".apply");
-  const dismissBtn = e.target.closest(".dismiss");
-  if (!applyBtn && !dismissBtn) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  // Use the tooltip-stored target (set when opening tooltip)
-  const target = tooltip._target;
-
-  if (!target || !target.isConnected) {
-    // If target is gone, just close tooltip (prevents "does nothing" confusion)
-    tooltip.classList.remove("visible");
-    tooltip._target = null;
-    activeError = null;
-    return;
-  }
-
-  if (applyBtn) {
-    const suggestion = target.dataset.suggestion || "";
-    target.replaceWith(document.createTextNode(suggestion));
-  }
-
-  if (dismissBtn) {
-    const original = target.dataset.original || "";
-    target.replaceWith(document.createTextNode(original));
-  }
-
-  lastPlainText = getPlainText();
-  sessionStorage.setItem("tc_text", lastPlainText);
-  updateCounts(lastPlainText);
-
-  tooltip.classList.remove("visible");
-  tooltip._target = null;
-  activeError = null;
-}, true);
-
+  
   /* -------------------------------
      INIT
   /* -------------------------------
