@@ -796,9 +796,19 @@
   const tooltip = document.createElement("div");
   tooltip.className = "tooltip-portal";
   document.body.appendChild(tooltip);
+  
   tooltip.id = "tc-tooltip";
   window.__tcTooltip = tooltip;
   console.log("tc tooltip ref:", tooltip);
+
+
+  function hideTooltip() {
+  tooltip.classList.remove("visible");
+  tooltip.style.display = "none";
+  tooltip.style.visibility = "hidden";
+  tooltip.innerHTML = "";
+  activeError = null;
+}
 
   editor.addEventListener("click", (e) => {
     console.log("🖱️ Editor clicked:", e.target);
