@@ -1,567 +1,1004 @@
 {% load static %}
 
+
 <!DOCTYPE html>
 <html lang="no">
 <head>
   <link rel="icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
-  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'checker/favicon_io/favicon-32x32.png' %}">
-  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'checker/favicon_io/favicon-16x16.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'checker/favicon_io/apple-touch-icon.png' %}">
-  <link rel="shortcut icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
-  <link rel="manifest" href="{% static 'checker/favicon_io/site.webmanifest' %}">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'checker/favicon_io/favicon-32x32.png' %}">
+<link rel="icon" type="image/png" sizes="16x16" href="{% static 'checker/favicon_io/favicon-16x16.png' %}">
+<link rel="apple-touch-icon" href="{% static 'checker/favicon_io/apple-touch-icon.png' %}">
+<link rel="shortcut icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
 
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Rettskriving Sjekk – Korrektur og Grammatikk på Norsk</title>
-  <meta name="description" content="Sjekk rettskriving, grammatikk og tegnsetting på norsk. Bruk vårt gratis korrekturverktøy for feilfri tekst – ingen innlogging, ingen kostnad">
-  <link rel="stylesheet" href="{% static 'checker/main.css' %}">
+<link rel="manifest" href="{% static 'checker/favicon_io/site.webmanifest' %}">
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <title>Rettskriving Sjekk – Korrektur og Grammatikk på Norsk</title>
+ <meta name="description" content="Sjekk rettskriving, grammatikk og tegnsetting på norsk. Bruk vårt gratis korrekturverktøy for feilfri tekst – ingen innlogging, ingen kostnad">
+ <link rel="stylesheet" href="{% static 'checker/main.css' %}">
 </head>
 <body>
-  {% include "checker/header.html" %}
+ {% include "checker/header.html" %}
 
-  <div class="wrap">
-    <main class="card" id="korr">
 
-      <div class="card__body">
-        <header>
-          <h1>Rett teksten din med Rettskriving Sjekk</h1>
-          <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
-        </header>
-      </div>
+ <div class="wrap">
+   <main class="card" id="korr">
 
-      <div class="card__body">
-        <form method="POST" id="form">
-          {% csrf_token %}
 
-          <div
-            id="text-editor"
-            class="editor"
-            contenteditable="true"
-            role="textbox"
-            aria-multiline="true"
-            spellcheck="false"
-            placeholder="Lim inn teksten din her..."></div>
+     <div class="card__body">
+       <header>
+        <h1>Rett teksten din med Rettskriving Sjekk</h1>
+        <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
+        
+       </header>
+     </div>
 
-          <p id="length-error" class="length-error" hidden>
+
+     <div class="card__body">
+       <form method="POST" id="form">
+         {% csrf_token %}
+
+
+         <div
+           id="text-editor"
+           class="editor"
+           contenteditable="true"
+           role="textbox"
+           aria-multiline="true"
+           spellcheck="false"
+           placeholder="Lim inn teksten din her..."></div>
+           <p id="length-error" class="length-error" hidden>
             Teksten er for lang. Du kan rette maks 800 tegn om gangen.
-          </p>
 
-          <div class="meta" id="counter">
-            <div class="counter" aria-live="polite">
-              <span id="words">0</span> ord
-              <span>·</span>
-              <span id="chars">0</span> tegn
-            </div>
-          </div>
+           </p>
+          
 
-          <div class="actions">
-            <button type="submit" id="submit" class="btn btn--primary">
-              <span class="spinner" aria-hidden="true"></span>
-              Rett tekst
-            </button>
-            <button class="btn btn--ghost" id="clear">Tøm</button>
-          </div>
-        </form>
-      </div>
 
-      <div class="card__body">
-        <section class="seo seo--rich" aria-labelledby="seo-title">
+         <div class="meta" id="counter">
+           <div class="counter" aria-live="polite">
+            <span id="words">0</span> ord
+            <span>·</span>
+            <span id="chars">0</span> tegn
+            
+           </div>
+         </div>
 
-          <style>
-            h1, h2, h3 { color: #2c3e50; }
-            ul { padding-left: 20px; }
-            li { margin-bottom: 10px; }
-            blockquote { border-left: 4px solid #ccc; padding-left: 10px; color: #555; margin: 20px 0; }
-          </style>
 
-          <h1>Rett skriv feilfritt med Rettskriving Sjekk</h1>
-
-          <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
-
-          <hr>
-
-          <h2>Hva kan du bruke Rettskriving Sjekk til?</h2>
-          <p>Enten du skriver e-post, skoleoppgaver, rapporter, artikler eller sosiale medier, hjelper Rettskriving Sjekk deg med å skrive korrekt og profesjonelt. Verktøyet passer for studenter, profesjonelle, lærere, og alle som skriver på norsk.</p>
-          <ul>
-            <li><strong>Grammatikk sjekk:</strong> Finner og forklarer grammatiske feil</li>
-            <li><strong>Stavekontroll norsk:</strong> Retter feilstavede ord raskt og nøyaktig</li>
-            <li><strong>Tegnsettingskontroll:</strong> Oppdager manglende komma, punktum og mer</li>
-            <li><strong>Riktig stavemåte og språkflyt:</strong> Gjør teksten lettere å lese</li>
-            <li><strong>Korrektur og språkvask:</strong> Forbedrer setningsstruktur og stil</li>
-          </ul>
-
-          <hr>
-
-          <h2>Hvorfor velge Rettskriving Sjekk?</h2>
-          <ul class="feature-list">
-            <li><span class="check"></span><strong>Gratis og tilgjengelig</strong>: Ingen registrering, ingen betaling</li>
-            <li><span class="check"></span><strong>Rask og enkel å bruke</strong>: Lim inn teksten og se resultatene umiddelbart</li>
-            <li><span class="check"></span><strong>Bygget for norsk</strong>: Spesielt utviklet for norsk grammatikk og rettskriving</li>
-            <li><span class="check"></span><strong>AI-drevet teknologi</strong>: Bruker avansert algoritme for presis korreksjon</li>
-          </ul>
-
-          <hr>
-
-          <h2>Vanlige spørsmål (FAQ)</h2>
-          <p>
-            <strong>Er dette verktøyet virkelig gratis?</strong><br>
-            Ja. Rettskriving Sjekk er 100 % gratis å bruke, uten skjulte kostnader.
-          </p>
-
-          <p><strong>Trenger jeg å laste ned noe?</strong><br>Nei, det hele skjer direkte på nettsiden – bare lim inn teksten og rett i vei.</p>
-
-          <hr>
-
-          <h2>Start korrekturen nå</h2>
-          <p>Prøv Rettskriving Sjekk nedenfor. Få rask, enkel og nøyaktig korrektur på sekunder.</p>
-
-          <p><strong>Ingen brukerregistrering. Ingen kostnad. Bare ren, korrekt norsk tekst.</strong></p>
-
-          <hr>
-
-          <blockquote>
-            Klar til å rette teksten din? Scroll ned og prøv Rettskriving Sjekk nå!
-          </blockquote>
-
-        </section>
-      </div>
-
-    </main>
-  </div>
-
-  {% include "checker/footer.html" %}
-
-  <!-- LOGIN MODAL -->
-  <div class="modal" id="auth-modal" aria-hidden="true">
-    <div class="modal__overlay"></div>
-    <div class="modal__content" role="dialog" aria-modal="true">
-
-      <button class="modal__close" id="auth-close" aria-label="Lukk">×</button>
-
-      <h2 class="subheading">Logg inn</h2>
-      <p class="sub">Du må være innlogget for å rette tekst.</p>
-
-      <form method="post" action="{% url 'login' %}" class="auth-form">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.path }}">
-
-        <div class="auth-fields">
-          <input type="email" name="email" required placeholder="E-post" autocomplete="email">
-          <input type="password" name="password" required placeholder="Passord" autocomplete="current-password">
-        </div>
-
-        <div class="auth-actions">
-          <button class="btn btn--primary" type="submit">Logg inn</button>
-
-          <button type="button" class="auth-link" id="open-register">
-            Opprett konto
+         <div class="actions">
+          <button type="submit" id="submit" class="btn btn--primary">
+            <span class="spinner" aria-hidden="true"></span>
+            Rett tekst
           </button>
-        </div>
+          <button class="btn btn--ghost" id="clear">Tøm</button>
+          
+         </div>
+       </form>
+     </div>
 
-      </form>
 
-    </div>
+     <div class="card__body">
+      <section class="seo seo--rich" aria-labelledby="seo-title">
+
+
+        <style>
+          h1, h2, h3 { color: #2c3e50; }
+          ul { padding-left: 20px; }
+          li { margin-bottom: 10px; }
+          blockquote { border-left: 4px solid #ccc; padding-left: 10px; color: #555; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <h1>Rett skriv feilfritt med Rettskriving Sjekk</h1>
+      
+        <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
+      
+        <hr>
+      
+        <h2>Hva kan du bruke Rettskriving Sjekk til?</h2>
+        <p>Enten du skriver e-post, skoleoppgaver, rapporter, artikler eller sosiale medier, hjelper Rettskriving Sjekk deg med å skrive korrekt og profesjonelt. Verktøyet passer for studenter, profesjonelle, lærere, og alle som skriver på norsk.</p>
+        <ul>
+          <li><strong>Grammatikk sjekk:</strong> Finner og forklarer grammatiske feil</li>
+          <li><strong>Stavekontroll norsk:</strong> Retter feilstavede ord raskt og nøyaktig</li>
+          <li><strong>Tegnsettingskontroll:</strong> Oppdager manglende komma, punktum og mer</li>
+          <li><strong>Riktig stavemåte og språkflyt:</strong> Gjør teksten lettere å lese</li>
+          <li><strong>Korrektur og språkvask:</strong> Forbedrer setningsstruktur og stil</li>
+        </ul>
+      
+        <hr>
+      
+        <h2>Hvorfor velge Rettskriving Sjekk?</h2>
+        <ul class="feature-list">
+          <li><span class="check"></span><strong>Gratis og tilgjengelig</strong>: Ingen registrering, ingen betaling</li>
+          <li><span class="check"></span><strong>Rask og enkel å bruke</strong>: Lim inn teksten og se resultatene umiddelbart</li>
+          <li><span class="check"></span><strong>Bygget for norsk</strong>: Spesielt utviklet for norsk grammatikk og rettskriving</li>
+          <li><span class="check"></span><strong>AI-drevet teknologi</strong>: Bruker avansert algoritme for presis korreksjon</li>
+        </ul>
+        
+      
+        <hr>
+      
+        <h2>Vanlige spørsmål (FAQ)</h2>
+        <p>
+          <strong>Er dette verktøyet virkelig gratis?</strong><br>
+          Ja. Rettskriving Sjekk er 100 % gratis å bruke, uten skjulte kostnader.
+        </p>
+              
+        <p><strong>Trenger jeg å laste ned noe?</strong><br>Nei, det hele skjer direkte på nettsiden – bare lim inn teksten og rett i vei.</p>
+      
+      
+        <hr>
+      
+        <h2>Start korrekturen nå</h2>
+        <p>Prøv Rettskriving Sjekk nedenfor. Få rask, enkel og nøyaktig korrektur på sekunder.</p>
+      
+        <p><strong>Ingen brukerregistrering. Ingen kostnad. Bare ren, korrekt norsk tekst.</strong></p>
+      
+        <hr>
+      
+
+      
+        <blockquote>
+          Klar til å rette teksten din? Scroll ned og prøv Rettskriving Sjekk nå!
+        </blockquote>
+      
+      
+      
+      
+      </section>
+      
+     </div>
+
+
+   </main>
+ </div>
+
+
+ {% include "checker/footer.html" %}
+
+<!-- LOGIN MODAL -->
+<div class="modal" id="auth-modal" aria-hidden="true">
+  <div class="modal__overlay"></div>
+  <div class="modal__content" role="dialog" aria-modal="true">
+ 
+ 
+    <button class="modal__close" id="auth-close" aria-label="Lukk">×</button>
+ 
+ 
+    <h2 class="subheading">Logg inn</h2>
+    <p class="sub">Du må være innlogget for å rette tekst.</p>
+ 
+ 
+    <form method="post" action="{% url 'login' %}" class="auth-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+   
+      <div class="auth-fields">
+        <input type="email" name="email" required placeholder="E-post" autocomplete="email">
+        <input type="password" name="password" required placeholder="Passord" autocomplete="current-password">
+      </div>
+     
+   
+      <div class="auth-actions">
+        <button class="btn btn--primary" type="submit">Logg inn</button>
+     
+        <button type="button" class="auth-link" id="open-register">
+          Opprett konto
+        </button>
+      </div>
+     
+    </form>
+   
+ 
+ 
   </div>
+ </div>
+ 
+ 
+ <!-- REGISTER MODAL -->
+ <div class="modal" id="register-modal" aria-hidden="true">
+  <div class="modal__overlay"></div>
+  <div class="modal__content" role="dialog" aria-modal="true">
+ 
+ 
+    <button class="modal__close" id="register-close" aria-label="Lukk">×</button>
+ 
+ 
+    <h2 class="subheading" style="margin-top: 0px;">Opprett konto</h2>
+    <p class="sub">Opprett en konto for å kunne rette tekst.</p>
+ 
+ 
+    <!-- Uses Django’s default UserCreationForm field names -->
+    <form method="post" action="{% url 'register' %}" class="auth-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+   
+      <div class="auth-fields">
+        <input type="text" name="name" required placeholder="Navn" autocomplete="name">
+        <input type="email" name="email" required placeholder="E-post" autocomplete="email">
+        <input type="password" name="password" required placeholder="Passord" autocomplete="new-password">
+      </div>
+     
+   
+      <div class="auth-actions">
+        <button class="btn btn--primary" type="submit">Opprett konto</button>
+        <button type="button" class="auth-link" id="open-login">
+          Jeg har allerede en konto
+        </button>
+              </div>
+ 
+   </form>
+  
 
-  <!-- REGISTER MODAL -->
-  <div class="modal" id="register-modal" aria-hidden="true">
-    <div class="modal__overlay"></div>
-    <div class="modal__content" role="dialog" aria-modal="true">
 
-      <button class="modal__close" id="register-close" aria-label="Lukk">×</button>
+ </div>
+</div>
 
-      <h2 class="subheading" style="margin-top: 0px;">Opprett konto</h2>
-      <p class="sub">Opprett en konto for å kunne rette tekst.</p>
 
-      <!-- Uses Django’s default UserCreationForm field names -->
-      <form method="post" action="{% url 'register' %}" class="auth-form">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.path }}">
 
-        <div class="auth-fields">
-          <input type="text" name="name" required placeholder="Navn" autocomplete="name">
-          <input type="email" name="email" required placeholder="E-post" autocomplete="email">
-          <input type="password" name="password" required placeholder="Passord" autocomplete="new-password">
-        </div>
 
-        <div class="auth-actions">
-          <button class="btn btn--primary" type="submit">Opprett konto</button>
-          <button type="button" class="auth-link" id="open-login">
-            Jeg har allerede en konto
-          </button>
-        </div>
+<style>
+  /* Modal sizing */
+ /* Center modal vertically + horizontally */
+ .modal{
+  position: fixed;
+  inset: 0;
+  display: none;        /* hidden by default */
+  z-index: 1000;
+  padding: 24px;
+ }
+ 
+ 
+ .modal.active{
+  display: flex;        /* ONLY show when active */
+  align-items: center;
+  justify-content: center;
+ }
+ 
+ 
+ 
+ 
+ /* Make overlay cover full screen behind content */
+ .modal__overlay{
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+ }
+ 
+ 
+ /* Your sizing stays, just remove any margin-based centering */
+ .modal__content{
+  position: relative;
+  max-width: 560px;
+  width: 100%;
+  padding: 30px 32px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 40px rgba(0,0,0,.2);
+ }
+ 
+ 
+ /* Center modal title + subtitle */
+ .modal__content h2,
+ .modal__content .sub{
+  text-align: center;
+ }
+ 
+ 
+ .sub{
+  margin-bottom: 30px;
+ }
+ 
+ 
+ .subheading{
+  margin-bottom: 0px;
+ }
+ 
+ 
+ /* Layout */
+ .auth-form{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 20px;
+ }
+ 
+ 
+ /* spacing BETWEEN fields only */
+ .auth-fields{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  width:100%;
+  align-items:center;
+ }
+ 
+ 
+ /* spacing BETWEEN buttons only */
+ .auth-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:14px;
+  width:100%;
+  align-items:center;
+ }
+ 
+ 
+ /* shared width */
+ .auth-fields input,
+ .auth-actions .btn{
+  width:450px;
+  max-width:100%;
+ }
+ 
+ 
+ /* ✅ Modern input styling */
+ .auth-fields input{
+  appearance:none;
+  -webkit-appearance:none;
+  height:46px;
+  padding:0 14px;
+  border:1.5px solid #cbd5e1;
+  border-radius:12px;
+  background:#f9fafb;
+  color:var(--text);
+  font-size:15px;
+  line-height:1;
+  outline:none;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+ }
+ 
+ 
+ .auth-fields input::placeholder{
+  color:#6b7280;
+  opacity: 1;
+ }
+ 
+ 
+ .auth-fields input:focus{
+  background:#fff;
+  border-color: color-mix(in oklab, var(--accent), #fff 30%);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+ }
+ 
+ 
+ /* Optional: nicer autofill */
+ .auth-fields input:-webkit-autofill{
+  -webkit-text-fill-color: var(--text);
+  box-shadow: 0 0 0 1000px #f9fafb inset;
+  transition: background-color 9999s ease-out 0s;
+ }
+ .auth-fields input:-webkit-autofill:focus{
+  box-shadow:
+    0 0 0 1000px #fff inset,
+    0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+ }
+ 
+ 
+ /* Keep your modal buttons clean (no bottom "stripe") */
+ .modal .btn--primary{
+  box-shadow:none;
+ }
+ 
+ 
+ .modal__close{
+  position:absolute;
+  top:14px;
+  right:14px;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid #e5e7eb;
+  border-radius:999px;
+  background:rgba(249,250,251,.95);
+  color:#111827;
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .02s ease;
+ }
+ 
+ 
+ .modal__close:hover{
+  background:#fff;
+  border-color:#cbd5e1;
+  box-shadow:0 8px 20px rgba(17,24,39,.12);
+ }
+ 
+ 
+ .modal__close:active{
+  transform:translateY(1px);
+ }
+ 
+ 
+ .modal__close:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+  border-color: color-mix(in oklab, var(--accent), #fff 30%);
+ }
+ 
+ 
+ .auth-link{
+  background:none;
+  border:none;
+  padding:0;
+  margin-top:10px;
+  color: var(--accent);
+  font-weight:600;
+  font-size:14px;
+  line-height:1.2;
+  cursor:pointer;
+  text-decoration:none;
+  transition: opacity .15s ease, transform .02s ease;
+ }
+ 
+ 
+ .auth-link:hover{
+  text-decoration:underline;
+  text-underline-offset:3px;
+ }
+ 
+ 
+ .auth-link:active{
+  transform:translateY(1px);
+ }
+ 
+ 
+ .auth-link:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
+  border-radius:8px;
+  padding:4px 8px;
+  margin-top:6px;
+ }
+ 
+ 
+ .seo.seo--rich{
+   margin-top: 8px;
+   padding-top: 6px;
+   color: var(--text);
+ }
+ 
+ .seo.seo--rich h2{
+   margin: 0 0 10px;
+   font-size: 1.25rem;
+   letter-spacing: .2px;
+ }
+ 
+ .seo.seo--rich h3{
+   margin: 18px 0 8px;
+   font-size: 1.05rem;
+   letter-spacing: .15px;
+ }
+ 
+ .seo.seo--rich p{
+   margin: 10px 0;
+   color: var(--text);
+   max-width: 80ch;
+ }
+ 
+ .seo.seo--rich ul{
+   margin: 10px 0 12px;
+   padding-left: 18px;
+   display: grid;
+   gap: 8px;
+   max-width: 80ch;
+ }
+ 
+ .seo.seo--rich li{
+   color: var(--text);
+ }
+ 
+ .seo-checklist{
+   list-style: none;
+   padding-left: 0;
+ }
+ 
+ .seo-checklist li{
+   position: relative;
+   padding-left: 26px;
+ }
+ 
+ .seo-checklist li::before{
+   content: "✓";
+   position: absolute;
+   left: 0;
+   top: 0;
+   color: var(--accent);
+   font-weight: 800;
+ }
+ 
+ .seo-tool-slot{
+   margin-top: 14px;
+   padding: 12px 14px;
+   border: 1px dashed color-mix(in oklab, var(--accent), var(--border) 55%);
+   border-radius: 12px;
+   background: color-mix(in oklab, var(--accent), #fff 92%);
+   color: color-mix(in oklab, var(--accent), #000 35%);
+   font-weight: 600;
+   max-width: 80ch;
+ }
+ 
+ 
+ #text-editor .error {
+   display: inline-block;
+   cursor: pointer;
+   border-radius: 3px;
+   padding: 0 2px;
+   background: rgba(239, 68, 68, 0.18);
+   box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.95);
+   text-decoration: none;
+ }
+ 
 
-      </form>
+ .feature-list {
+  list-style: none;
+  padding: 0;
+}
 
-    </div>
-  </div>
+.feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 
-  <style>
-    /* Modal sizing */
-    /* Center modal vertically + horizontally */
-    .modal{
-      position: fixed;
-      inset: 0;
-      display: none;        /* hidden by default */
-      z-index: 1000;
-      padding: 24px;
+.feature-list .check {
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.feature-list .check::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+
+ 
+ /* --- FORCE MAIN CONTENT CENTERING (SAFE, NON-DESTRUCTIVE) --- */
+ main,
+ main > .wrap,
+ body > .wrap{
+   margin-inline: auto;
+ }
+ </style>
+ 
+
+
+<script src="{% static 'checker/main.js' %}"></script>
+
+
+<script>
+ // Login modal
+ const authModal = document.getElementById("auth-modal");
+ const authClose = document.getElementById("auth-close");
+
+
+ // Register modal
+ const registerModal = document.getElementById("register-modal");
+ const registerClose = document.getElementById("register-close");
+
+
+ // Switch buttons
+ const openRegisterBtn = document.getElementById("open-register");
+ const openLoginBtn = document.getElementById("open-login");
+
+
+ function openAuthModal(){
+   authModal.classList.add("active");
+   authModal.setAttribute("aria-hidden", "false");
+ }
+
+
+ function closeAuthModal(){
+   authModal.classList.remove("active");
+   authModal.setAttribute("aria-hidden", "true");
+ }
+
+
+ function openRegisterModal(){
+ closeAuthModal();
+ registerModal.classList.add("active");
+ registerModal.setAttribute("aria-hidden", "false");
+}
+
+
+ function closeRegisterModal(){
+   registerModal.classList.remove("active");
+   registerModal.setAttribute("aria-hidden", "true");
+ }
+
+
+ // Close handlers
+ authClose?.addEventListener("click", closeAuthModal);
+ authModal?.querySelector(".modal__overlay")?.addEventListener("click", closeAuthModal);
+
+
+ registerClose?.addEventListener("click", closeRegisterModal);
+ registerModal?.querySelector(".modal__overlay")?.addEventListener("click", closeRegisterModal);
+
+
+ // Switch between modals
+ openRegisterBtn?.addEventListener("click", () => {
+   closeAuthModal();
+   openRegisterModal();
+ });
+
+
+ openLoginBtn?.addEventListener("click", () => {
+ closeRegisterModal();
+ openAuthModal();
+});
+
+
+
+
+ // Make functions available to main.js
+ window.openAuthModal = openAuthModal;
+ window.openRegisterModal = openRegisterModal;
+</script>
+
+<script>
+  (function () {
+  console.log("✅ main.js loaded");
+  document.addEventListener("click", (e) => {
+    console.log("🌍 GLOBAL CLICK:", e.target);
+  });
+
+  function openAuthModal(){
+    window.openAuthModal && window.openAuthModal();
+  }
+  
+  
+  const MAX_WORDS = 800;
+
+  function countWords(text) {
+    return (text.trim().match(/\S+/g) || []).length;
+  }
+  
+
+
+  const errorEl = document.getElementById("length-error");
+
+  function enforceLengthLimit(text) {
+    const wordCount = countWords(text);
+    const tooLong = wordCount > MAX_WORDS;
+  
+    submit.disabled = tooLong;
+    submit.classList.toggle("is-disabled", tooLong);
+  
+    editor.classList.toggle("is-too-long", tooLong);
+  
+    if (errorEl) {
+      errorEl.hidden = !tooLong;
+      errorEl.textContent =
+        "Texten är för lång. Du kan rätta max 800 ord åt gången.";
+    }
+  }
+  
+  
+  
+
+  const $ = (s, scope = document) => scope.querySelector(s);
+
+  const editor   = $("#text-editor");
+  const wordsEl  = $("#words");
+  const charsEl  = $("#chars");
+  const form     = $("#form");
+  const submit   = $("#submit");
+  const clearBtn = $("#clear");
+
+  if (!editor || !form) return;
+
+  let lastPlainText = "";
+  let activeError = null;
+
+  /* -------------------------------
+     TEXT HELPERS
+  --------------------------------*/
+  function escapeHTML(str) {
+    return (str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function htmlWithNewlines(str) {
+    return escapeHTML(str).replace(/\n/g, "<br>");
+  }
+
+  function getPlainText() {
+    return (editor.innerText || "").replace(/\u00A0/g, " ");
+  }
+
+  function updateCounts(text) {
+    const t = text || "";
+    wordsEl.textContent = (t.trim().match(/\S+/g) || []).length;
+    charsEl.textContent = t.length;
+  }
+
+  /* -------------------------------
+     WORD-LEVEL DIFF
+  --------------------------------*/
+  function tokenizeWords(text) {
+    const tokens = [];
+    // ✅ include optional punctuation as part of the "word" so apply actually changes text
+    const regex = /\p{L}+[.,;:!?]?/gu;
+    let match;
+
+    while ((match = regex.exec(text))) {
+      tokens.push({
+        word: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+    return tokens;
+  }
+
+  function getWordDiffs(original, corrected) {
+    const oWords = tokenizeWords(original);
+    const cWords = tokenizeWords(corrected);
+
+    const diffs = [];
+    const len = Math.min(oWords.length, cWords.length);
+
+    for (let i = 0; i < len; i++) {
+      if (oWords[i].word !== cWords[i].word) {
+        diffs.push({
+          start: oWords[i].start,
+          end: oWords[i].end,
+          original: oWords[i].word,
+          suggestion: cWords[i].word,
+        });
+      }
+    }
+    return diffs;
+  }
+
+  /* -------------------------------
+     RENDER HIGHLIGHTS (UNCHANGED)
+  --------------------------------*/
+  function buildHighlightedHTML(text, diffs) {
+    if (!diffs.length) return htmlWithNewlines(text);
+
+    let html = "";
+    let last = 0;
+
+    for (const d of diffs) {
+      html += htmlWithNewlines(text.slice(last, d.start));
+      html += `<span class="error"
+      data-original="${escapeHTML(d.original)}"
+      data-suggestion="${escapeHTML(d.suggestion)}"
+    >${escapeHTML(d.original)}</span>`;
+    
+          last = d.end;
     }
 
-    .modal.active{
-      display: flex;        /* ONLY show when active */
-      align-items: center;
-      justify-content: center;
-    }
+    html += htmlWithNewlines(text.slice(last));
+    return html;
+  }
 
-    /* Make overlay cover full screen behind content */
-    .modal__overlay{
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,.45);
-      backdrop-filter: blur(3px);
-    }
+  /* -------------------------------
+     TOOLTIP PORTAL (NO LAYOUT SHIFT)
+  --------------------------------*/
+  const tooltip = document.createElement("div");
+  tooltip.className = "tooltip-portal";
+  document.body.appendChild(tooltip);
+  tooltip.id = "tc-tooltip";
+  window.__tcTooltip = tooltip;
+  console.log("tc tooltip ref:", tooltip);
 
-    /* Your sizing stays, just remove any margin-based centering */
-    .modal__content{
-      position: relative;
-      max-width: 560px;
-      width: 100%;
-      padding: 30px 32px;
-      border-radius: 16px;
-      background: #fff;
-      box-shadow: 0 20px 40px rgba(0,0,0,.2);
-    }
-
-    /* Center modal title + subtitle */
-    .modal__content h2,
-    .modal__content .sub{
-      text-align: center;
-    }
-
-    .sub{
-      margin-bottom: 30px;
-    }
-
-    .subheading{
-      margin-bottom: 0px;
-    }
-
-    /* Layout */
-    .auth-form{
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap: 20px;
-    }
-
-    /* spacing BETWEEN fields only */
-    .auth-fields{
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-      width:100%;
-      align-items:center;
-    }
-
-    /* spacing BETWEEN buttons only */
-    .auth-actions{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      margin-top:14px;
-      width:100%;
-      align-items:center;
-    }
-
-    /* shared width */
-    .auth-fields input,
-    .auth-actions .btn{
-      width:450px;
-      max-width:100%;
-    }
-
-    /* ✅ Modern input styling */
-    .auth-fields input{
-      appearance:none;
-      -webkit-appearance:none;
-      height:46px;
-      padding:0 14px;
-      border:1.5px solid #cbd5e1;
-      border-radius:12px;
-      background:#f9fafb;
-      color:var(--text);
-      font-size:15px;
-      line-height:1;
-      outline:none;
-      transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
-    }
-
-    .auth-fields input::placeholder{
-      color:#6b7280;
-      opacity: 1;
-    }
-
-    .auth-fields input:focus{
-      background:#fff;
-      border-color: color-mix(in oklab, var(--accent), #fff 30%);
-      box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-    }
-
-    /* Optional: nicer autofill */
-    .auth-fields input:-webkit-autofill{
-      -webkit-text-fill-color: var(--text);
-      box-shadow: 0 0 0 1000px #f9fafb inset;
-      transition: background-color 9999s ease-out 0s;
-    }
-    .auth-fields input:-webkit-autofill:focus{
-      box-shadow:
-        0 0 0 1000px #fff inset,
-        0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-    }
-
-    /* Keep your modal buttons clean (no bottom "stripe") */
-    .modal .btn--primary{
-      box-shadow:none;
-    }
-
-    .modal__close{
-      position:absolute;
-      top:14px;
-      right:14px;
-      width:38px;
-      height:38px;
-      display:grid;
-      place-items:center;
-      border:1px solid #e5e7eb;
-      border-radius:999px;
-      background:rgba(249,250,251,.95);
-      color:#111827;
-      font-size:18px;
-      line-height:1;
-      cursor:pointer;
-      transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .02s ease;
-    }
-
-    .modal__close:hover{
-      background:#fff;
-      border-color:#cbd5e1;
-      box-shadow:0 8px 20px rgba(17,24,39,.12);
-    }
-
-    .modal__close:active{
-      transform:translateY(1px);
-    }
-
-    .modal__close:focus-visible{
-      outline:none;
-      box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-      border-color: color-mix(in oklab, var(--accent), #fff 30%);
-    }
-
-    .auth-link{
-      background:none;
-      border:none;
-      padding:0;
-      margin-top:10px;
-      color: var(--accent);
-      font-weight:600;
-      font-size:14px;
-      line-height:1.2;
-      cursor:pointer;
-      text-decoration:none;
-      transition: opacity .15s ease, transform .02s ease;
-    }
-
-    .auth-link:hover{
-      text-decoration:underline;
-      text-underline-offset:3px;
-    }
-
-    .auth-link:active{
-      transform:translateY(1px);
-    }
-
-    .auth-link:focus-visible{
-      outline:none;
-      box-shadow:0 0 0 4px color-mix(in oklab, var(--accent), #fff 82%);
-      border-radius:8px;
-      padding:4px 8px;
-      margin-top:6px;
-    }
-
-    .seo.seo--rich{
-      margin-top: 8px;
-      padding-top: 6px;
-      color: var(--text);
-    }
-
-    .seo.seo--rich h2{
-      margin: 0 0 10px;
-      font-size: 1.25rem;
-      letter-spacing: .2px;
-    }
-
-    .seo.seo--rich h3{
-      margin: 18px 0 8px;
-      font-size: 1.05rem;
-      letter-spacing: .15px;
-    }
-
-    .seo.seo--rich p{
-      margin: 10px 0;
-      color: var(--text);
-      max-width: 80ch;
-    }
-
-    .seo.seo--rich ul{
-      margin: 10px 0 12px;
-      padding-left: 18px;
-      display: grid;
-      gap: 8px;
-      max-width: 80ch;
-    }
-
-    .seo.seo--rich li{
-      color: var(--text);
-    }
-
-    .seo-checklist{
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .seo-checklist li{
-      position: relative;
-      padding-left: 26px;
-    }
-
-    .seo-checklist li::before{
-      content: "✓";
-      position: absolute;
-      left: 0;
-      top: 0;
-      color: var(--accent);
-      font-weight: 800;
-    }
-
-    .seo-tool-slot{
-      margin-top: 14px;
-      padding: 12px 14px;
-      border: 1px dashed color-mix(in oklab, var(--accent), var(--border) 55%);
-      border-radius: 12px;
-      background: color-mix(in oklab, var(--accent), #fff 92%);
-      color: color-mix(in oklab, var(--accent), #000 35%);
-      font-weight: 600;
-      max-width: 80ch;
-    }
-
-    #text-editor .error {
-      display: inline-block;
-      cursor: pointer;
-      border-radius: 3px;
-      padding: 0 2px;
-      background: rgba(239, 68, 68, 0.18);
-      box-shadow: inset 0 -2px 0 rgba(239, 68, 68, 0.95);
-      text-decoration: none;
-    }
-
-    .feature-list {
-      list-style: none;
-      padding: 0;
-    }
-
-    .feature-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .feature-list .check {
-      width: 16px;
-      height: 16px;
-      margin-top: 4px;
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .feature-list .check::after {
-      content: "";
-      position: absolute;
-      left: 3px;
-      top: 1px;
-      width: 6px;
-      height: 10px;
-      border: solid currentColor;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
-
-    /* --- FORCE MAIN CONTENT CENTERING (SAFE, NON-DESTRUCTIVE) --- */
-    main,
-    main > .wrap,
-    body > .wrap{
-      margin-inline: auto;
-    }
-  </style>
-
-  <script src="{% static 'checker/main.js' %}"></script>
-
-  <script>
-    // Login modal
-    const authModal = document.getElementById("auth-modal");
-    const authClose = document.getElementById("auth-close");
-
-    // Register modal
-    const registerModal = document.getElementById("register-modal");
-    const registerClose = document.getElementById("register-close");
-
-    // Switch buttons
-    const openRegisterBtn = document.getElementById("open-register");
-    const openLoginBtn = document.getElementById("open-login");
-
-    function openAuthModal(){
-      authModal.classList.add("active");
-      authModal.setAttribute("aria-hidden", "false");
-    }
-
-    function closeAuthModal(){
-      authModal.classList.remove("active");
-      authModal.setAttribute("aria-hidden", "true");
-    }
-
-    function openRegisterModal(){
-      closeAuthModal();
-      registerModal.classList.add("active");
-      registerModal.setAttribute("aria-hidden", "false");
-    }
-
-    function closeRegisterModal(){
-      registerModal.classList.remove("active");
-      registerModal.setAttribute("aria-hidden", "true");
-    }
-
-    // Close handlers
-    authClose?.addEventListener("click", closeAuthModal);
-    authModal?.querySelector(".modal__overlay")?.addEventListener("click", closeAuthModal);
-
-    registerClose?.addEventListener("click", closeRegisterModal);
-    registerModal?.querySelector(".modal__overlay")?.addEventListener("click", closeRegisterModal);
-
-    // Switch between modals
-    openRegisterBtn?.addEventListener("click", () => {
-      closeAuthModal();
-      openRegisterModal();
+  editor.addEventListener("click", (e) => {
+    console.log("🖱️ Editor clicked:", e.target);
+    const error = e.target.closest(".error");
+    if (!error) return;
+  
+    activeError = error;
+    console.log("❗ Active error set:", activeError, {
+      original: error.dataset.original,
+      suggestion: error.dataset.suggestion
     });
+  
+    // 1️⃣ Inject tooltip content
+    tooltip.innerHTML = `
+      <div class="suggestion">${error.dataset.suggestion}</div>
+      <div class="actions">
+        <button type="button" class="apply">Tillämpa</button>
+        <button type="button" class="dismiss">Avvisa</button>
+      </div>
+    `;
+  
+    // 2️⃣ Force render (hidden) so dimensions are REAL
+    tooltip.style.visibility = "hidden";
+    tooltip.style.display = "block";
+    tooltip.style.left = "0px";
+    tooltip.style.top = "0px";
+    tooltip.style.transform = "none";
+  
+    // 3️⃣ Measure
+    const wordRect = error.getBoundingClientRect();
+    const tipRect  = tooltip.getBoundingClientRect();
+  
+    const GAP = 12;
+    const PADDING = 8;
+  
+    // 4️⃣ Position ABOVE word (fallback BELOW if needed)
+    let top = wordRect.top - tipRect.height - GAP;
+    if (top < PADDING) {
+      top = wordRect.bottom + GAP;
+    }
+  
+    // 5️⃣ Center horizontally + clamp to viewport
+    let left = wordRect.left + wordRect.width / 2;
+    const minLeft = PADDING + tipRect.width / 2;
+    const maxLeft = window.innerWidth - PADDING - tipRect.width / 2;
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+  
+    // 6️⃣ Apply final position & show
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.transform = "translateX(-50%)";
+    tooltip.style.visibility = "visible";
+    tooltip.classList.add("visible");
+  });
 
-    openLoginBtn?.addEventListener("click", () => {
-      closeRegisterModal();
-      openAuthModal();
-    });
+  /* -------------------------------
+     APPLY / DISMISS (WORKING)
+  --------------------------------*/
+document.addEventListener("click", (e) => {
+  const applyBtn = e.target.closest(".tooltip-portal .apply");
+  const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
+  if (!applyBtn && !dismissBtn) return;
 
-    // Make functions available to main.js
-    window.openAuthModal = openAuthModal;
-    window.openRegisterModal = openRegisterModal;
-  </script>
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (!activeError) return;
+
+  if (applyBtn) {
+    const suggestion = activeError.dataset.suggestion || "";
+    activeError.replaceWith(document.createTextNode(suggestion));
+  } else {
+    const original = activeError.dataset.original || "";
+    activeError.replaceWith(document.createTextNode(original));
+  }
+
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
+
+  document.querySelector(".tooltip-portal")?.classList.remove("visible");
+  activeError = null;
+}, true);
+
+  
+  /* -------------------------------
+     INIT
+  /* -------------------------------
+     INIT
+  --------------------------------*/
+  /* -------------------------------
+     INIT
+  --------------------------------*/
+  const saved = sessionStorage.getItem("tc_text");
+  if (saved) {
+    lastPlainText = saved;
+    editor.innerHTML = htmlWithNewlines(saved);
+  }
+
+  updateCounts(lastPlainText);
+  editor.focus();
+
+  /* -------------------------------
+     INPUT
+  --------------------------------*/
+  editor.addEventListener("input", () => {
+    lastPlainText = getPlainText();
+    sessionStorage.setItem("tc_text", lastPlainText);
+    updateCounts(lastPlainText);
+  
+    enforceLengthLimit(lastPlainText);
+  });
+  
+  
+
+  clearBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    editor.innerHTML = "";
+    lastPlainText = "";
+    sessionStorage.removeItem("tc_text");
+    updateCounts("");
+    editor.focus();
+  });
+
+  /* -------------------------------
+     SUBMIT
+  --------------------------------*/
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+  
+    const text = lastPlainText.trim();
+    if (!text) return;
+  
+    // 🚫 HARD STOP — NEVER allow loading when too long
+    const wordCount = countWords(text);
+
+    if (wordCount > MAX_WORDS) {
+      enforceLengthLimit(text);
+      submit.classList.remove("is-loading");
+      return;
+    }
+    
+  
+    // ✅ Only now we allow loading
+    submit.disabled = true;
+    submit.classList.add("is-loading");
+  
+    try {
+      const res = await fetch("/", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+          "X-Requested-With": "XMLHttpRequest",
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ text }),
+      });
+  
+      // 🔐 NOT LOGGED IN
+      if (res.status === 401) {
+        submit.disabled = false;
+        submit.classList.remove("is-loading");
+  
+        if (window.openRegisterModal) {
+          window.openRegisterModal();
+        } else if (window.openAuthModal) {
+          window.openAuthModal();
+        }
+        return;
+      }
+  
+      const data = await res.json();
+      const diffs = getWordDiffs(
+        data.original_text,
+        data.corrected_text
+      );
+  
+      editor.innerHTML = buildHighlightedHTML(
+        data.original_text,
+        diffs
+      );
+  
+      lastPlainText = data.original_text;
+      sessionStorage.setItem("tc_text", lastPlainText);
+      updateCounts(lastPlainText);
+  
+    } catch (err) {
+      console.error("Submit error:", err);
+    } finally {
+      submit.disabled = false;
+      submit.classList.remove("is-loading");
+    }
+  });
+  
+
+
+})();
+
+</script>
 </body>
 </html>
+
