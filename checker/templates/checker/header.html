@@ -44,10 +44,14 @@
   }
 
   .site-header .wrap--header{
-  max-width:100%;
-  margin-inline:auto;   /* keep centering intact */
-}
-
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:0 20px;
+    overflow: visible; /* allow big logo to overflow without increasing header */
+  }
 
   .header-actions{
     display:flex;
@@ -85,8 +89,13 @@
 
 .site-header .wrap--header{
   max-width:100%;
-  margin-inline:auto;   /* keep centering intact */
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:0 20px;
+  overflow:visible;
 }
-
 
 </style>
