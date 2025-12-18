@@ -889,9 +889,8 @@ document.addEventListener("click", (e) => {
   sessionStorage.setItem("tc_text", lastPlainText);
   updateCounts(lastPlainText);
 
-  document.querySelector(".tooltip-portal")?.classList.remove("visible");
-  activeError = null;
-}, true);
+  hideTooltip();
+
 
   
   /* -------------------------------
