@@ -1,5 +1,8 @@
 (function () {
   console.log("✅ main.js loaded");
+  document.addEventListener("click", (e) => {
+    console.log("🌍 GLOBAL CLICK:", e.target);
+  });
 
   function openAuthModal(){
     window.openAuthModal && window.openAuthModal();
