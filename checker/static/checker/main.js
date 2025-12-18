@@ -190,6 +190,45 @@
     tooltip.classList.add("visible");
   });
   
+
+
+  /* -------------------------------
+   APPLY / DISMISS (INSIDE IIFE)
+--------------------------------*/
+tooltip.addEventListener("click", (e) => {
+  if (!activeError) return;
+
+  // ✅ APPLY
+  if (e.target.classList.contains("apply")) {
+    const suggestion = activeError.dataset.suggestion;
+
+    // Replace highlighted span with corrected text
+    activeError.replaceWith(document.createTextNode(suggestion));
+
+    // Sync state
+    lastPlainText = getPlainText();
+    sessionStorage.setItem("tc_text", lastPlainText);
+    updateCounts(lastPlainText);
+
+    tooltip.classList.remove("visible");
+    activeError = null;
+  }
+
+  // ❌ DISMISS
+  if (e.target.classList.contains("dismiss")) {
+    const original = activeError.dataset.original;
+
+    activeError.replaceWith(document.createTextNode(original));
+
+    lastPlainText = getPlainText();
+    sessionStorage.setItem("tc_text", lastPlainText);
+    updateCounts(lastPlainText);
+
+    tooltip.classList.remove("visible");
+    activeError = null;
+  }
+});
+
   /* -------------------------------
      INIT
   /* -------------------------------
@@ -303,42 +342,3 @@
 
 })();
 
-
-
-// Apply / Dismiss handlers (event delegation)
-tooltip.addEventListener("click", (e) => {
-  if (!activeError) return;
-
-  // ✅ APPLY
-  if (e.target.classList.contains("apply")) {
-    const suggestion = activeError.dataset.suggestion;
-
-    // Replace the error span with corrected text
-    const textNode = document.createTextNode(suggestion);
-    activeError.replaceWith(textNode);
-
-    // Update plain text + storage
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
-
-    // Cleanup
-    tooltip.classList.remove("visible");
-    activeError = null;
-  }
-
-  // ❌ DISMISS
-  if (e.target.classList.contains("dismiss")) {
-    // Just remove highlight, keep original word
-    const original = activeError.dataset.original;
-    const textNode = document.createTextNode(original);
-    activeError.replaceWith(textNode);
-
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
-
-    tooltip.classList.remove("visible");
-    activeError = null;
-  }
-});
