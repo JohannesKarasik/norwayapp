@@ -791,7 +791,7 @@
   /* -------------------------------
      TOOLTIP PORTAL (NO LAYOUT SHIFT)
   --------------------------------*/
-  const tooltip = document.createElement("div");
+  let tooltip = null;
   tooltip.className = "tooltip-portal";
   document.body.appendChild(tooltip);
   tooltip.id = "tc-tooltip";
@@ -867,37 +867,40 @@ if (!error) return;
      APPLY / DISMISS (WORKING)
   --------------------------------*/
   document.addEventListener("click", (e) => {
-    const applyBtn = e.target.closest(".tooltip-portal .apply");
-    const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
-    if (!applyBtn && !dismissBtn) return;
+  const applyBtn = e.target.closest(".tooltip-portal .apply");
+  const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
+  if (!applyBtn && !dismissBtn) return;
 
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopImmediatePropagation(); // 🔒 hard stop
 
-    if (!activeError) return;
+  if (!activeError) return;
 
-    if (applyBtn) {
-      const suggestion = activeError.dataset.suggestion || "";
-      activeError.replaceWith(document.createTextNode(suggestion));
-    } else {
-      const original = activeError.dataset.original || "";
-      activeError.replaceWith(document.createTextNode(original));
-    }
+  if (applyBtn) {
+    const suggestion = activeError.dataset.suggestion || "";
+    activeError.replaceWith(document.createTextNode(suggestion));
+  } else {
+    const original = activeError.dataset.original || "";
+    activeError.replaceWith(document.createTextNode(original));
+  }
 
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
 
-    // ✅ FORCE HIDE + CLEAR TOOLTIP IMMEDIATELY
-    tooltip.classList.remove("visible");
-    tooltip.innerHTML = "";
-    tooltip.style.display = "none";
-    tooltip.style.visibility = "hidden";
-    tooltip.style.opacity = "0";
-    tooltip.style.pointerEvents = "none";
+  if (tooltip && tooltip.parentNode) {
+  tooltip.parentNode.removeChild(tooltip);
+}
 
-    activeError = null;
-  }, true);
+tooltip = document.createElement("div");
+tooltip.className = "tooltip-portal";
+tooltip.id = "tc-tooltip";
+document.body.appendChild(tooltip);
+window.__tcTooltip = tooltip;
+
+
+  activeError = null;
+}, true);
 
   
   /* -------------------------------
