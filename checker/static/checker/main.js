@@ -141,12 +141,18 @@
   const tooltip = document.createElement("div");
   tooltip.className = "tooltip-portal";
   document.body.appendChild(tooltip);
+  console.log("🧩 Tooltip portal created:", tooltip);
 
   editor.addEventListener("click", (e) => {
+    console.log("🖱️ Editor clicked:", e.target);
     const error = e.target.closest(".error");
     if (!error) return;
   
     activeError = error;
+    console.log("❗ Active error set:", activeError, {
+      original: error.dataset.original,
+      suggestion: error.dataset.suggestion
+    });
   
     // 1️⃣ Inject tooltip content
     tooltip.innerHTML = `
@@ -195,17 +201,23 @@
      APPLY / DISMISS (WORKING)
   --------------------------------*/
   tooltip.addEventListener("click", (e) => {
+    console.log("🔥 Tooltip CLICK detected:", e.target);
     const applyBtn = e.target.closest(".apply");
     const dismissBtn = e.target.closest(".dismiss");
+    console.log("➡ applyBtn:", applyBtn);
+    console.log("➡ dismissBtn:", dismissBtn);
     if (!applyBtn && !dismissBtn) return;
 
     e.preventDefault();
     e.stopPropagation();
 
+    console.log("📌 activeError at click time:", activeError);
+
     if (!activeError) return;
 
     if (applyBtn) {
       const suggestion = activeError.dataset.suggestion || "";
+      console.log("✅ APPLY clicked — replacing with:", suggestion);
       activeError.replaceWith(document.createTextNode(suggestion));
     }
 
