@@ -234,3 +234,7 @@
   height: 64px;        /* prøv 64–72 */
   max-height: none;
 }
+
+.site-header {
+  height: 72px;
+}
