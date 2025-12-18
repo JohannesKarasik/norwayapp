@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 def correct_with_openai_sv(text: str) -> str:
     try:
         system_prompt = (
-            "Du är en professionell svensk språkre­daktör. "
-            "Din uppgift är att korrigera ALLA fel i stavning, grammatik, "
-            "ordföljd och skiljetecken (särskilt kommatecken). "
-            "Behåll betydelsen exakt. "
-            "Returnera ENDAST den korrigerade texten."
+            "Du er en profesjonell norsk språkre­daktør. "
+            "Din oppgave er å korrigere ALLE feil i rettskriving, grammatikk, "
+            "ordstilling og tegnsetting (spesielt komma). "
+            "Behold betydningen nøyaktig. "
+            "Returner KUN den korrigerte teksten."
         )
 
         resp = client.chat.completions.create(
@@ -33,6 +33,7 @@ def correct_with_openai_sv(text: str) -> str:
     except Exception:
         logger.exception("OpenAI error")
         return text
+
 
 
 def index(request):
