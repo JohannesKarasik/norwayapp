@@ -78,7 +78,8 @@
   --------------------------------*/
   function tokenizeWords(text) {
     const tokens = [];
-    const regex = /\p{L}+/gu;
+    // ✅ include optional punctuation as part of the "word" so apply actually changes text
+    const regex = /\p{L}+[.,;:!?]?/gu;
     let match;
 
     while ((match = regex.exec(text))) {
@@ -151,8 +152,8 @@
     tooltip.innerHTML = `
       <div class="suggestion">${error.dataset.suggestion}</div>
       <div class="actions">
-        <button class="apply">Tillämpa</button>
-        <button class="dismiss">Avvisa</button>
+        <button type="button" class="apply">Tillämpa</button>
+        <button type="button" class="dismiss">Avvisa</button>
       </div>
     `;
   
@@ -189,6 +190,38 @@
     tooltip.style.visibility = "visible";
     tooltip.classList.add("visible");
   });
+
+  /* -------------------------------
+     APPLY / DISMISS (WORKING)
+  --------------------------------*/
+  tooltip.addEventListener("click", (e) => {
+    const applyBtn = e.target.closest(".apply");
+    const dismissBtn = e.target.closest(".dismiss");
+    if (!applyBtn && !dismissBtn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!activeError) return;
+
+    if (applyBtn) {
+      const suggestion = activeError.dataset.suggestion || "";
+      activeError.replaceWith(document.createTextNode(suggestion));
+    }
+
+    if (dismissBtn) {
+      const original = activeError.dataset.original || "";
+      activeError.replaceWith(document.createTextNode(original));
+    }
+
+    lastPlainText = getPlainText();
+    sessionStorage.setItem("tc_text", lastPlainText);
+    updateCounts(lastPlainText);
+
+    tooltip.classList.remove("visible");
+    activeError = null;
+  });
+
   
   /* -------------------------------
      INIT
