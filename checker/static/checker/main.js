@@ -144,8 +144,10 @@
   const tooltip = document.createElement("div");
   tooltip.className = "tooltip-portal";
   document.body.appendChild(tooltip);
-  console.log("🧩 Tooltip portal created:", tooltip);
-
+  tooltip.id = "tc-tooltip";
+  window.__tcTooltip = tooltip;
+  console.log("tc tooltip ref:", tooltip);
+  
   editor.addEventListener("click", (e) => {
     console.log("🖱️ Editor clicked:", e.target);
     const error = e.target.closest(".error");
