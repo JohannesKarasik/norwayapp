@@ -6,7 +6,7 @@
       <img
         src="{% static 'checker/logo.png' %}"
         alt="RettTekst"
-        style="height:104px; width:auto; display:block; max-height:none;"
+        style="height:140px; width:auto; display:block; max-height:none;"
       >
     </a>
 
@@ -50,6 +50,7 @@
     justify-content:space-between;
     gap:16px;
     padding:0 20px;
+    overflow: visible; /* allow big logo to overflow without increasing header */
   }
 
   .header-actions{
