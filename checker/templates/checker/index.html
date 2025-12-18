@@ -2,7 +2,7 @@
 
 
 <!DOCTYPE html>
-<html lang="sv">
+<html lang="no">
 <head>
   <link rel="icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
 <link rel="icon" type="image/png" sizes="32x32" href="{% static 'checker/favicon_io/favicon-32x32.png' %}">
@@ -155,77 +155,77 @@
 
  {% include "checker/footer.html" %}
 
-
 <!-- LOGIN MODAL -->
 <div class="modal" id="auth-modal" aria-hidden="true">
- <div class="modal__overlay"></div>
- <div class="modal__content" role="dialog" aria-modal="true">
-
-
-   <button class="modal__close" id="auth-close" aria-label="Stäng">×</button>
-
-
-   <h2 class="subheading">Logga in</h2>
-   <p class="sub">Du måste vara inloggad för att rätta text.</p>
-
-
-   <form method="post" action="{% url 'login' %}" class="auth-form">
-     {% csrf_token %}
-     <input type="hidden" name="next" value="{{ request.path }}">
-  
-     <div class="auth-fields">
-       <input type="email" name="email" required placeholder="E-post" autocomplete="email">
-       <input type="password" name="password" required placeholder="Lösenord" autocomplete="current-password">
-     </div>
-    
-  
-     <div class="auth-actions">
-       <button class="btn btn--primary" type="submit">Logga in</button>
-    
-       <button type="button" class="auth-link" id="open-register">
-         Skapa konto
-       </button>
-     </div>
-    
-   </form>
-  
-
-
+  <div class="modal__overlay"></div>
+  <div class="modal__content" role="dialog" aria-modal="true">
+ 
+ 
+    <button class="modal__close" id="auth-close" aria-label="Lukk">×</button>
+ 
+ 
+    <h2 class="subheading">Logg inn</h2>
+    <p class="sub">Du må være innlogget for å rette tekst.</p>
+ 
+ 
+    <form method="post" action="{% url 'login' %}" class="auth-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+   
+      <div class="auth-fields">
+        <input type="email" name="email" required placeholder="E-post" autocomplete="email">
+        <input type="password" name="password" required placeholder="Passord" autocomplete="current-password">
+      </div>
+     
+   
+      <div class="auth-actions">
+        <button class="btn btn--primary" type="submit">Logg inn</button>
+     
+        <button type="button" class="auth-link" id="open-register">
+          Opprett konto
+        </button>
+      </div>
+     
+    </form>
+   
+ 
+ 
+  </div>
  </div>
-</div>
-
-
-<!-- REGISTER MODAL -->
-<div class="modal" id="register-modal" aria-hidden="true">
- <div class="modal__overlay"></div>
- <div class="modal__content" role="dialog" aria-modal="true">
-
-
-   <button class="modal__close" id="register-close" aria-label="Stäng">×</button>
-
-
-   <h2 class="subheading" style="margin-top: 0px;">Skapa konto</h2>
-   <p class="sub">Skapa ett konto för att kunna rätta text.</p>
-
-
-   <!-- Uses Django’s default UserCreationForm field names -->
-   <form method="post" action="{% url 'register' %}" class="auth-form">
-     {% csrf_token %}
-     <input type="hidden" name="next" value="{{ request.path }}">
-  
-     <div class="auth-fields">
-       <input type="text" name="name" required placeholder="Namn" autocomplete="name">
-       <input type="email" name="email" required placeholder="E-post" autocomplete="email">
-       <input type="password" name="password" required placeholder="Lösenord" autocomplete="new-password">
-     </div>
-    
-  
-     <div class="auth-actions">
-       <button class="btn btn--primary" type="submit">Skapa konto</button>
-       <button type="button" class="auth-link" id="open-login">
-         Jag har redan ett konto
-       </button>
-             </div>
+ 
+ 
+ <!-- REGISTER MODAL -->
+ <div class="modal" id="register-modal" aria-hidden="true">
+  <div class="modal__overlay"></div>
+  <div class="modal__content" role="dialog" aria-modal="true">
+ 
+ 
+    <button class="modal__close" id="register-close" aria-label="Lukk">×</button>
+ 
+ 
+    <h2 class="subheading" style="margin-top: 0px;">Opprett konto</h2>
+    <p class="sub">Opprett en konto for å kunne rette tekst.</p>
+ 
+ 
+    <!-- Uses Django’s default UserCreationForm field names -->
+    <form method="post" action="{% url 'register' %}" class="auth-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+   
+      <div class="auth-fields">
+        <input type="text" name="name" required placeholder="Navn" autocomplete="name">
+        <input type="email" name="email" required placeholder="E-post" autocomplete="email">
+        <input type="password" name="password" required placeholder="Passord" autocomplete="new-password">
+      </div>
+     
+   
+      <div class="auth-actions">
+        <button class="btn btn--primary" type="submit">Opprett konto</button>
+        <button type="button" class="auth-link" id="open-login">
+          Jeg har allerede en konto
+        </button>
+              </div>
+ 
    </form>
   
 
