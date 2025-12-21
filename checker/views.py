@@ -4,22 +4,22 @@ from openai import OpenAI
 import logging
 import re
 import difflib
-import unicodedata
 
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
 
 
+
 def correct_with_openai_no(text: str) -> str:
     """
-    Returns a corrected version of the text where:
-    - NO words are added or removed
-    - Word order is identical
-    - Only spelling and punctuation attached to a word may change
+    Correct Norwegian text WITHOUT changing:
+    - word count
+    - word order
+    - whitespace
     """
     try:
-        # ✅ COLLAPSE WHITESPACE (self-defensive)
+        # ✅ Canonical whitespace
         text = re.sub(r"\s+", " ", text).strip()
 
         system_prompt = (
@@ -32,10 +32,9 @@ def correct_with_openai_no(text: str) -> str:
             "- IKKE endre mellomrom eller linjeskift\n\n"
             "Du har KUN lov til å:\n"
             "- rette stavefeil INNE I eksisterende ord\n"
-            "- legge til eller fjerne tegnsetting SOM ER EN DEL AV ORDET "
-            "(f.eks. 'att' → 'att,')\n\n"
+            "- legge til eller fjerne tegnsetting SOM ER EN DEL AV ORDET\n\n"
             "Hvis en feil krever omskriving, LA DEN STÅ URØRT.\n\n"
-            "Returner KUN teksten, uten forklaring."
+            "Returner KUN teksten."
         )
 
         resp = client.chat.completions.create(
@@ -49,9 +48,9 @@ def correct_with_openai_no(text: str) -> str:
 
         corrected = (resp.choices[0].message.content or "").strip()
 
-        # 🔐 HARD SAFETY: word count must match
+        # HARD SAFETY: word count must match
         if len(corrected.split()) != len(text.split()):
-            logger.warning("Word count mismatch – falling back to original text")
+            logger.warning("Word count mismatch – disabling correction")
             return text
 
         return corrected if corrected else text
@@ -60,50 +59,52 @@ def correct_with_openai_no(text: str) -> str:
         logger.exception("OpenAI error")
         return text
 
-
 def find_differences_charwise(original: str, corrected: str):
-    diffs_out = []
+    """
+    Bullet-proof diff:
+    - Compares word-by-word ONLY
+    - Aborts immediately if alignment breaks
+    """
 
-    orig = unicodedata.normalize("NFC", original)
-    corr = unicodedata.normalize("NFC", corrected)
+    diffs = []
 
-    matcher = difflib.SequenceMatcher(a=orig, b=corr)
+    orig_words = original.split(" ")
+    corr_words = corrected.split(" ")
 
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag != "replace":
+    # ❌ Abort if alignment is impossible
+    if len(orig_words) != len(corr_words):
+        return []
+
+    cursor = 0
+
+    for orig, corr in zip(orig_words, corr_words):
+        start = cursor
+        end = start + len(orig)
+
+        if orig == corr:
+            cursor = end + 1
             continue
 
-        orig_chunk = orig[i1:i2]
-        corr_chunk = corr[j1:j2]
+        # Strip punctuation for comparison
+        o_core = orig.lower().strip(".,;:!?")
+        c_core = corr.lower().strip(".,;:!?")
 
-        # 🔒 Skip large or semantic rewrites
-        if len(orig_chunk.split()) != 1 or len(corr_chunk.split()) != 1:
-            continue
+        # Allow only small spelling fixes
+        if difflib.SequenceMatcher(a=o_core, b=c_core).ratio() < 0.8:
+            # ❌ Abort everything — alignment is unsafe
+            return []
 
-        a_core = orig_chunk.lower().strip(".,;:!?")
-        b_core = corr_chunk.lower().strip(".,;:!?")
+        diffs.append({
+            "type": "replace",
+            "start": start,
+            "end": end,
+            "original": orig,
+            "suggestion": corr,
+        })
 
-        if a_core == b_core:
-            diffs_out.append({
-                "type": "replace",
-                "start": i1,
-                "end": i2,
-                "original": orig_chunk,
-                "suggestion": corr_chunk,
-            })
-            continue
+        cursor = end + 1
 
-        ratio = difflib.SequenceMatcher(a=a_core, b=b_core).ratio()
-        if ratio >= 0.8:
-            diffs_out.append({
-                "type": "replace",
-                "start": i1,
-                "end": i2,
-                "original": orig_chunk,
-                "suggestion": corr_chunk,
-            })
-
-    return diffs_out
+    return diffs
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
@@ -117,7 +118,7 @@ def index(request):
                 "error_count": 0,
             })
 
-        # ✅ COLLAPSE ONCE, EARLY, AND USE EVERYWHERE
+        # ✅ Canonical text
         collapsed_text = re.sub(r"\s+", " ", raw_text).strip()
 
         corrected = correct_with_openai_no(collapsed_text)
