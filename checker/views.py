@@ -161,6 +161,31 @@ def find_differences_charwise(original: str, corrected: str):
 
     return diffs
 
+def restore_original_whitespace(original: str, corrected: str) -> str:
+    """
+    Keeps characters from corrected, but forces whitespace
+    (spaces, newlines, tabs) to match the original exactly.
+    """
+    out = []
+    i = j = 0
+
+    while i < len(original) and j < len(corrected):
+        if original[i].isspace():
+            out.append(original[i])
+            i += 1
+            if j < len(corrected) and corrected[j].isspace():
+                j += 1
+        else:
+            out.append(corrected[j])
+            i += 1
+            j += 1
+
+    # append remaining original whitespace if any
+    while i < len(original):
+        out.append(original[i])
+        i += 1
+
+    return "".join(out)
 
 # -------------------------------------------------
 # OPENAI CORRECTION (UNCHANGED)
@@ -198,21 +223,19 @@ def correct_with_openai_no(text: str) -> str:
         )
 
         corrected = (r.choices[0].message.content or "").strip()
-
-        # -------------------------------------------------
-        # 🔒 HARD WHITESPACE SAFETY (THIS IS THE KEY)
-        # -------------------------------------------------
-        # If ANY whitespace changed → reject correction
-        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            logger.warning("Whitespace changed by model – rejecting correction")
+        if not corrected:
             return text
 
-        return corrected or text
+        # 🔒 FIX whitespace instead of rejecting everything
+        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
+            logger.warning("Whitespace changed by model – repairing whitespace")
+            corrected = restore_original_whitespace(text, corrected)
+
+        return corrected
 
     except Exception:
         logger.exception("OpenAI error")
         return text
-
 
 
 # -------------------------------------------------
