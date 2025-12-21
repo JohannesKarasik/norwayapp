@@ -12,18 +12,95 @@ logger = logging.getLogger(__name__)
 # Tokenization (alignment-safe)
 # -----------------------------
 
-TOKEN_RE = re.compile(r"\S+")
 
-def tokenize_with_offsets(text: str):
-    """
-    Returns list of (token, start, end)
-    preserving exact character offsets.
-    """
-    return [
-        (m.group(), m.start(), m.end())
-        for m in TOKEN_RE.finditer(text)
-    ]
+import re
+import difflib
+import unicodedata
 
+def find_differences_charwise(original: str, corrected: str):
+    diffs_out = []
+
+    orig_text = unicodedata.normalize("NFC", original)
+    corr_text = unicodedata.normalize("NFC", corrected)
+
+    def merge_punctuation(tokens):
+        merged = []
+        for tok in tokens:
+            if merged and re.match(r"^[,.:;!?]$", tok):
+                merged[-1] += tok
+            else:
+                merged.append(tok)
+        return merged
+
+    orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
+    corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
+
+    orig_positions = []
+    cursor = 0
+    for tok in orig_tokens:
+        start_idx = orig_text.find(tok, cursor)
+        end_idx = start_idx + len(tok)
+        orig_positions.append((start_idx, end_idx))
+        cursor = end_idx
+
+    def span_for_range(i_start, i_end_exclusive):
+        if i_start >= len(orig_positions):
+            return len(orig_text), len(orig_text)
+        if i_start == i_end_exclusive:
+            start_i, _ = orig_positions[i_start]
+            return start_i, start_i
+        return orig_positions[i_start][0], orig_positions[i_end_exclusive - 1][1]
+
+    def tokens_are_small_edit(a, b):
+        if a.lower().strip(",.;:!?") == b.lower().strip(",.;:!?"):
+            return True
+        return difflib.SequenceMatcher(a=a.lower(), b=b.lower()).ratio() >= 0.6
+
+    def is_pure_punctuation(tok):
+        return bool(re.fullmatch(r"[,.:;!?]+", tok))
+
+    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+
+        if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
+            o, c = orig_tokens[i1], corr_tokens[j1]
+            if tokens_are_small_edit(o, c):
+                s, e = span_for_range(i1, i2)
+                diffs_out.append({
+                    "type": "replace",
+                    "start": s,
+                    "end": e,
+                    "original": o,
+                    "suggestion": c,
+                })
+
+        elif tag == "delete" and (i2 - i1) == 1:
+            o = orig_tokens[i1]
+            if is_pure_punctuation(o) or len(o) <= 2:
+                s, e = span_for_range(i1, i2)
+                diffs_out.append({
+                    "type": "delete",
+                    "start": s,
+                    "end": e,
+                    "original": o,
+                    "suggestion": "",
+                })
+
+        elif tag == "insert" and (j2 - j1) == 1:
+            c = corr_tokens[j1]
+            if is_pure_punctuation(c):
+                s, _ = span_for_range(i1, i1)
+                diffs_out.append({
+                    "type": "insert",
+                    "start": s,
+                    "end": s,
+                    "original": "",
+                    "suggestion": c,
+                })
+
+    return diffs_out
 
 # -----------------------------
 # OpenAI correction (SAFE MODE)
@@ -81,37 +158,6 @@ def correct_with_openai_no(text: str) -> str:
 # Token-wise diff (bulletproof)
 # -----------------------------
 
-def find_differences_tokenwise(original: str, corrected: str):
-    diffs = []
-
-    orig_tokens = tokenize_with_offsets(original)
-    corr_tokens = tokenize_with_offsets(corrected)
-
-    # Abort immediately if alignment breaks
-    if len(orig_tokens) != len(corr_tokens):
-        return []
-
-    for (o_tok, o_start, o_end), (c_tok, _, _) in zip(orig_tokens, corr_tokens):
-        if o_tok == c_tok:
-            continue
-
-        o_core = o_tok.lower().strip(".,;:!?")
-        c_core = c_tok.lower().strip(".,;:!?")
-
-        # Allow only small spelling corrections
-        if difflib.SequenceMatcher(a=o_core, b=c_core).ratio() < 0.85:
-            return []  # abort entire diff safely
-
-        diffs.append({
-            "type": "replace",
-            "start": o_start,
-            "end": o_end,
-            "original": o_tok,
-            "suggestion": c_tok,
-        })
-
-    return diffs
-
 
 # -----------------------------
 # Main view
@@ -130,7 +176,7 @@ def index(request):
             })
 
         corrected = correct_with_openai_no(original_text)
-        differences = find_differences_tokenwise(original_text, corrected)
+        differences = find_differences_charwise(original_text, corrected)
 
         return JsonResponse({
             "original_text": original_text,
