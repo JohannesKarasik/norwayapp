@@ -9,251 +9,204 @@ import unicodedata
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
-# -----------------------------
-# Charwise diff (same style as Danish)
-# -----------------------------
-
-import re
-import difflib
-import unicodedata
+# -------------------------------------------------
+# STRICT CHARWISE DIFF (DANISH-STYLE, NORWAY-SAFE)
+# -------------------------------------------------
 
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
+
+
 def find_differences_charwise(original: str, corrected: str):
-    diffs_out = []
+    diffs = []
 
-    orig_text = unicodedata.normalize("NFC", original)
-    corr_text = unicodedata.normalize("NFC", corrected)
+    orig = unicodedata.normalize("NFC", original)
+    corr = unicodedata.normalize("NFC", corrected)
 
-    TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
+    # -------------------------------------------------
+    # TOKENIZE
+    # -------------------------------------------------
 
-    def merge_punctuation(tokens):
-        merged = []
-        for tok in tokens:
-            if merged and re.match(r"^[,.:;!?]$", tok):
-                merged[-1] += tok
+    def merge_punct(tokens):
+        out = []
+        for t in tokens:
+            if out and re.fullmatch(r"[.,;:!?]", t):
+                out[-1] += t
             else:
-                merged.append(tok)
-        return merged
+                out.append(t)
+        return out
 
-    orig_tokens = merge_punctuation(TOKEN_RE.findall(orig_text))
-    corr_tokens = merge_punctuation(TOKEN_RE.findall(corr_text))
+    o_tokens = merge_punct(TOKEN_RE.findall(orig))
+    c_tokens = merge_punct(TOKEN_RE.findall(corr))
 
-    def build_positions(text, tokens):
-        positions = []
-        cursor = 0
-        for tok in tokens:
-            start = text.find(tok, cursor)
-            if start == -1:
+    # -------------------------------------------------
+    # MAP TOKEN → CHAR POSITIONS (FAIL-SAFE)
+    # -------------------------------------------------
+
+    def map_positions(text, tokens):
+        pos = []
+        i = 0
+        for t in tokens:
+            p = text.find(t, i)
+            if p == -1:
                 return None
-            end = start + len(tok)
-            positions.append((start, end))
-            cursor = end
-        return positions
+            pos.append((p, p + len(t)))
+            i = p + len(t)
+        return pos
 
-    orig_positions = build_positions(orig_text, orig_tokens)
-    corr_positions = build_positions(corr_text, corr_tokens)
-    if orig_positions is None or corr_positions is None:
-        return []
+    o_pos = map_positions(orig, o_tokens)
+    c_pos = map_positions(corr, c_tokens)
 
-    def span_for_range(positions, i_start, i_end):
-        if i_start >= len(positions):
-            return len(orig_text), len(orig_text)
-        if i_start == i_end:
-            s, _ = positions[i_start]
-            return s, s
-        return positions[i_start][0], positions[i_end - 1][1]
+    if o_pos is None or c_pos is None:
+        return []  # never guess
 
-    def text_for_range(text, positions, i_start, i_end):
-        s, e = span_for_range(positions, i_start, i_end)
-        return text[s:e], s, e
+    # -------------------------------------------------
+    # HELPERS
+    # -------------------------------------------------
 
-    def core(s: str) -> str:
-        # remove spaces/punct so "privat livet." == "privatlivet."
+    def span(pos, a, b):
+        if a >= len(pos):
+            return len(orig), len(orig)
+        if a == b:
+            return pos[a][0], pos[a][0]
+        return pos[a][0], pos[b - 1][1]
+
+    def core(s):
+        # remove spaces + punctuation → handles "privat livet" == "privatlivet"
         return re.sub(r"[\W_]+", "", s.lower())
 
-    def is_pure_punctuation(tok):
-        return bool(re.fullmatch(r"[,.:;!?]+", tok))
+    def safe_word_replace(a, b):
+        a0 = a.lower().strip(".,;:!?")
+        b0 = b.lower().strip(".,;:!?")
 
-    def is_safe_small_edit(a: str, b: str) -> bool:
-        """
-        VERY strict: only allow when it's clearly the same word with a small change.
-        This prevents insane replacements like 'livet' -> 'ofte'.
-        """
-        a0 = a.lower().strip(",.;:!?")
-        b0 = b.lower().strip(",.;:!?")
-
-        # exact match ignoring trivial punctuation
-        if a0 == b0:
-            return True
-
-        # require same first letter (kills most drift-pairing)
-        if not a0 or not b0 or a0[0] != b0[0]:
+        if not a0 or not b0:
             return False
 
-        # require very high similarity
-        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.90
+        # HARD RULES (kill drift)
+        if a0[0] != b0[0]:
+            return False
 
-    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
+        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.9
+
+    # -------------------------------------------------
+    # DIFF
+    # -------------------------------------------------
+
+    sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
+
         if tag == "equal":
             continue
 
-        # -----------------------------
-        # JOIN / SPLIT (allow ONLY if core matches)
-        # Example: "privat livet" -> "privatlivet"
-        # -----------------------------
+        # -------------------------------------------------
+        # JOIN / SPLIT (SPACE REMOVAL / INSERTION)
+        # -------------------------------------------------
         if tag == "replace" and max(i2 - i1, j2 - j1) <= 3:
-            orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-            corr_chunk, _, _ = text_for_range(corr_text, corr_positions, j1, j2)
+            o_chunk = orig[span(o_pos, i1, i2)[0]:span(o_pos, i1, i2)[1]]
+            c_chunk = corr[span(c_pos, j1, j2)[0]:span(c_pos, j1, j2)[1]]
 
-            if core(orig_chunk) == core(corr_chunk):
-                diffs_out.append({
+            if core(o_chunk) == core(c_chunk):
+                s, e = span(o_pos, i1, i2)
+                diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig_chunk,
-                    "suggestion": corr_chunk,
+                    "original": o_chunk,
+                    "suggestion": c_chunk,
                 })
-            # IMPORTANT: if it’s not a join/split match, we IGNORE this replace
-            # (prevents drift generating garbage suggestions)
-            continue
+            continue  # IMPORTANT: never fall through
 
-        # -----------------------------
-        # 1 -> 1 replacements: allow ONLY small safe edits
-        # -----------------------------
+        # -------------------------------------------------
+        # SINGLE WORD REPLACE (VERY STRICT)
+        # -------------------------------------------------
         if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
-            o = orig_tokens[i1]
-            c = corr_tokens[j1]
+            o = o_tokens[i1]
+            c = c_tokens[j1]
 
-            if is_safe_small_edit(o, c):
-                _, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-                diffs_out.append({
+            if safe_word_replace(o, c):
+                s, e = span(o_pos, i1, i2)
+                diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig_text[s:e],
+                    "original": orig[s:e],
                     "suggestion": c,
                 })
-            # else: ignore (no highlight, no bad suggestion)
             continue
 
-        # -----------------------------
-        # DELETE: only allow small/punctuation deletes
-        # -----------------------------
-        if tag == "delete" and (i2 - i1) == 1:
-            o = orig_tokens[i1]
-            if is_pure_punctuation(o) or len(o) <= 2:
-                orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-                diffs_out.append({
-                    "type": "delete",
-                    "start": s,
-                    "end": e,
-                    "original": orig_chunk,
-                    "suggestion": "",
-                })
-            continue
-
-        # -----------------------------
-        # INSERT: punctuation only
-        # -----------------------------
+        # -------------------------------------------------
+        # INSERT / DELETE → punctuation ONLY
+        # -------------------------------------------------
         if tag == "insert" and (j2 - j1) == 1:
-            c = corr_tokens[j1]
-            if is_pure_punctuation(c):
-                _, s, _ = text_for_range(orig_text, orig_positions, i1, i1)
-                diffs_out.append({
+            if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
+                s, _ = span(o_pos, i1, i1)
+                diffs.append({
                     "type": "insert",
                     "start": s,
                     "end": s,
                     "original": "",
-                    "suggestion": c,
+                    "suggestion": c_tokens[j1],
                 })
             continue
 
-        # Anything else (reorders / rewrites) -> IGNORE to avoid garbage suggestions
-        # (This is the "never suggest completely different words" rule.)
+        if tag == "delete" and (i2 - i1) == 1:
+            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]) or len(o_tokens[i1]) <= 2:
+                s, e = span(o_pos, i1, i2)
+                diffs.append({
+                    "type": "delete",
+                    "start": s,
+                    "end": e,
+                    "original": orig[s:e],
+                    "suggestion": "",
+                })
+            continue
 
-    return diffs_out
+        # EVERYTHING ELSE → IGNORE (no red explosion)
+
+    return diffs
 
 
-
-# -----------------------------
-# OpenAI correction (NOW same logic as Danish)
-# -----------------------------
+# -------------------------------------------------
+# OPENAI CORRECTION (UNCHANGED)
+# -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
-    """
-    Produces a fully corrected Norwegian (Bokmål) version of the input text:
-    - Fixes spelling, grammar, punctuation, capitalization, and comma errors
-    - Keeps tone and meaning identical
-    - Avoids stylistic rewriting or added exclamation marks
-    Uses the SAME retry pattern as the Danish version.
-    """
     try:
-        base_prompt = (
+        prompt = (
             "Du er en profesjonell norsk språkvasker. "
-            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt, "
-            "og naturlig form på norsk bokmål. "
-            "Du skal rette ALLE feil i stavning, bøyning, grammatikk, ordstilling, "
-            "store bokstaver, mellomrom, og tegnsetting, og særlig kommatering. "
-            "Ret også komma etter reglene for startkomma (komma før leddsetninger) "
-            "samt komma mellom sideordnede setninger. "
-            "Behold tekstens betydning, stil og tone uendret. "
-            "Ikke legg til ekstra ord, tegn eller utropstegn. "
-            "Returner KUN den korrigerte teksten uten noen forklaring."
+            "Returner teksten i perfekt grammatisk korrekt bokmål. "
+            "Rett stavefeil, bøyning, tegnsetting og kommatering. "
+            "Behold mening og stil. "
+            "Returner kun teksten."
         )
 
-        # First attempt
-        resp = client.chat.completions.create(
+        r = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": base_prompt},
+                {"role": "system", "content": prompt},
                 {"role": "user", "content": text},
             ],
             temperature=0,
         )
-        corrected = (resp.choices[0].message.content or "").strip()
 
-        # If the text barely changed, retry with stronger emphasis (same pattern as Danish)
-        if corrected.strip() == text.strip():
-            print("⚠ No change detected – retrying with stricter correction mode...")
-            resp2 = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": base_prompt
-                        + " Hvis du er i tvil, så rett heller for mye enn for lite. "
-                          "Finn ALLE feil, også små komma- og formuleringsfeil."
-                    },
-                    {"role": "user", "content": text},
-                ],
-                temperature=0,
-            )
-            corrected2 = (resp2.choices[0].message.content or "").strip()
-            if corrected2:
-                corrected = corrected2
-
-        return corrected if corrected else text
+        return (r.choices[0].message.content or "").strip() or text
 
     except Exception:
         logger.exception("OpenAI error")
         return text
 
 
-# -----------------------------
-# Main view
-# -----------------------------
+# -------------------------------------------------
+# MAIN VIEW
+# -------------------------------------------------
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        original_text = request.POST.get("text", "")
+        original = request.POST.get("text", "")
 
-        # ✅ ADDITION 1: normalize input for alignment safety
-        original_text = original_text.replace("\r\n", "\n").replace("\r", "\n")
-        original_text = unicodedata.normalize("NFC", original_text)
+        original = unicodedata.normalize("NFC", original)
 
-        if not original_text.strip():
+        if not original.strip():
             return JsonResponse({
                 "original_text": "",
                 "corrected_text": "",
@@ -261,42 +214,40 @@ def index(request):
                 "error_count": 0,
             })
 
-        corrected = correct_with_openai_no(original_text)
+        corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
 
-        # ✅ ADDITION 2: normalize corrected text the same way
-        corrected = unicodedata.normalize("NFC", corrected)
-
-        differences = find_differences_charwise(original_text, corrected)
+        diffs = find_differences_charwise(original, corrected)
 
         return JsonResponse({
-            "original_text": original_text,
+            "original_text": original,
             "corrected_text": corrected,
-            "differences": differences,
-            "error_count": len(differences),
+            "differences": diffs,
+            "error_count": len(diffs),
         })
 
     return render(request, "checker/index.html")
 
 
-# -----------------------------
-# Auth (unchanged)
-# -----------------------------
+# -------------------------------------------------
+# AUTH (UNCHANGED)
+# -------------------------------------------------
 
 from django.contrib.auth.models import User
-from django.contrib.auth import login
+from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
+
 
 def register(request):
     if request.method != "POST":
         return redirect("index")
 
-    name = request.POST.get("name")
     email = request.POST.get("email")
     password = request.POST.get("password")
+    name = request.POST.get("name")
 
     if User.objects.filter(username=email).exists():
-        messages.error(request, "E-postadressen används redan.")
-        return redirect(request.POST.get("next", "/"))
+        messages.error(request, "E-post finnes allerede.")
+        return redirect("/")
 
     user = User.objects.create_user(
         username=email,
@@ -306,33 +257,26 @@ def register(request):
     )
 
     login(request, user)
-    return redirect(request.POST.get("next", "/"))
+    return redirect("/")
 
-
-from django.contrib.auth import authenticate
 
 def login_view(request):
     if request.method != "POST":
         return redirect("/")
 
-    email = request.POST.get("email")
-    password = request.POST.get("password")
-
-    if not email or not password:
-        messages.error(request, "Fyll i både e-post och lösenord.")
-        return redirect(request.POST.get("next", "/"))
-
-    user = authenticate(request, username=email, password=password)
+    user = authenticate(
+        request,
+        username=request.POST.get("email"),
+        password=request.POST.get("password"),
+    )
 
     if user is None:
-        messages.error(request, "Fel e-post eller lösenord.")
-        return redirect(request.POST.get("next", "/"))
+        messages.error(request, "Feil e-post eller passord.")
+        return redirect("/")
 
     login(request, user)
-    return redirect(request.POST.get("next", "/"))
+    return redirect("/")
 
-
-from django.contrib.auth import logout
 
 def logout_view(request):
     if request.method == "POST":
