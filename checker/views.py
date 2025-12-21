@@ -15,9 +15,92 @@ logger = logging.getLogger(__name__)
 
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
+# -------------------------------------------------
+# HELPERS (TOP-LEVEL — IMPORTANT)
+# -------------------------------------------------
+
+def norm_word(tok: str) -> str:
+    return tok.lower().strip(".,;:!?")
+
+def levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    if len(a) > len(b):
+        a, b = b, a
+
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        cur = [i]
+        for j, cb in enumerate(b, start=1):
+            cur.append(min(
+                cur[j - 1] + 1,
+                prev[j] + 1,
+                prev[j - 1] + (ca != cb),
+            ))
+        prev = cur
+    return prev[-1]
+
+def safe_word_replace(o, c):
+    """
+    General spelling / inflection safety:
+    - Allows: tekst→tekster, de→dem, jobb→job
+    - Blocks large rewrites
+    - Language-agnostic
+    """
+    o0 = norm_word(o)
+    c0 = norm_word(c)
+
+    if not o0 or not c0 or o0 == c0:
+        return False
+
+    L = max(len(o0), len(c0))
+
+    # Block extreme jumps
+    if abs(len(o0) - len(c0)) > 3 and L <= 8:
+        return False
+    if abs(len(o0) - len(c0)) > 4:
+        return False
+
+    # Anchor for non-trivial words
+    if L >= 4:
+        if not (o0[:2] == c0[:2] or o0[-2:] == c0[-2:]):
+            return False
+
+    dist = levenshtein(o0, c0)
+
+    if L <= 3:
+        return dist <= 1
+    if L <= 6:
+        return dist <= 2
+    if L <= 10:
+        return dist <= 3
+
+    ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
+    return ratio >= 0.82
+
+def is_compound_join(o_tokens, i1, c_tok):
+    """
+    Blocks: privat + livet → privatlivet
+    """
+    c0 = norm_word(c_tok)
+    if not c0:
+        return False
+
+    cur = norm_word(o_tokens[i1]) if i1 < len(o_tokens) else ""
+    nxt = norm_word(o_tokens[i1 + 1]) if i1 + 1 < len(o_tokens) else ""
+    prv = norm_word(o_tokens[i1 - 1]) if i1 - 1 >= 0 else ""
+
+    return (
+        (nxt and c0 == cur + nxt) or
+        (prv and c0 == prv + cur)
+    )
 
 # -------------------------------------------------
-# CHARWISE DIFF (SIMPLE, SAFE)
+# DIFF ENGINE
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,110 +145,13 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def norm_word(tok: str) -> str:
-        return tok.lower().strip(".,;:!?")
-
-    def levenshtein(a: str, b: str) -> int:
-        """Small, fast Levenshtein for short tokens."""
-        if a == b:
-            return 0
-        if not a:
-            return len(b)
-        if not b:
-            return len(a)
-
-        # Ensure a is shorter
-        if len(a) > len(b):
-            a, b = b, a
-
-        prev = list(range(len(b) + 1))
-        for i, ca in enumerate(a, start=1):
-            cur = [i]
-            for j, cb in enumerate(b, start=1):
-                ins = cur[j - 1] + 1
-                dele = prev[j] + 1
-                sub = prev[j - 1] + (ca != cb)
-                cur.append(min(ins, dele, sub))
-            prev = cur
-        return prev[-1]
-
-def safe_word_replace(o, c):
-    """
-    General "safe" single-token replacement:
-    - Allows typical spelling + small inflection changes (tekst->tekster, de->dem)
-    - Blocks big rewrites
-    - Does NOT need explicit word lists
-    Compound-joins are blocked elsewhere by is_compound_join().
-    """
-    o0 = norm_word(o)
-    c0 = norm_word(c)
-
-    if not o0 or not c0 or o0 == c0:
-        return False
-
-    # Hard block extreme length jumps (prevents many wild swaps)
-    L = max(len(o0), len(c0))
-    if abs(len(o0) - len(c0)) > 3 and L <= 8:
-        return False
-    if abs(len(o0) - len(c0)) > 4:
-        return False
-
-    # Require SOME shared anchor for non-trivial words (avoids "random" swaps)
-    # For very short tokens, the edit-distance constraint below is enough.
-    if L >= 4:
-        if not (o0[:2] == c0[:2] or o0[-2:] == c0[-2:]):
-            return False
-
-    dist = levenshtein(o0, c0)
-
-    # Accept by edit distance (tight for short words, slightly looser for longer)
-    if L <= 3:
-        return dist <= 1          # de->dem (dist 1), dt->det (dist 1)
-    if L <= 6:
-        return dist <= 2          # tekst->tekster (dist 2)
-    if L <= 10:
-        return dist <= 3
-
-    # For longer words, also require decent similarity
-    ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
-    return dist <= 3 and ratio >= 0.82
-
-    def is_compound_join(o_tokens, i1, c_tok):
-        """
-        Blocks compound joins like:
-        'privat' + 'livet' -> 'privatlivet'
-        even if the diff comes out as a 1->1 replace.
-        """
-        c0 = norm_word(c_tok)
-        if not c0:
-            return False
-
-        cur = norm_word(o_tokens[i1]) if i1 < len(o_tokens) else ""
-        nxt = norm_word(o_tokens[i1 + 1]) if (i1 + 1) < len(o_tokens) else ""
-        prv = norm_word(o_tokens[i1 - 1]) if (i1 - 1) >= 0 else ""
-
-        if not cur:
-            return False
-
-        if nxt and (cur + nxt) == c0:
-            return True
-        if prv and (prv + cur) == c0:
-            return True
-
-        if nxt and c0.startswith(cur) and c0.endswith(nxt) and len(c0) > len(cur) and len(c0) > len(nxt):
-            return True
-        if prv and c0.startswith(prv) and c0.endswith(cur) and len(c0) > len(prv) and len(c0) > len(cur):
-            return True
-
-        return False
-
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             continue
 
-        # Ignore joins/splits entirely when they show up as multi-token changes
+        # Ignore joins/splits
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -173,23 +159,20 @@ def safe_word_replace(o, c):
             o_tok = o_tokens[i1]
             c_tok = c_tokens[j1]
 
-            # Block compound joins even if they appear as 1->1 replace
             if is_compound_join(o_tokens, i1, c_tok):
                 continue
 
             if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
-                orig_span = orig[s:e]
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig_span,
+                    "original": orig[s:e],
                     "suggestion": c_tok,
                 })
-            continue
 
-        if tag == "insert" and (j2 - j1) == 1:
+        elif tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
                 diffs.append({
@@ -199,9 +182,8 @@ def safe_word_replace(o, c):
                     "original": "",
                     "suggestion": c_tokens[j1],
                 })
-            continue
 
-        if tag == "delete" and (i2 - i1) == 1:
+        elif tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
                 diffs.append({
@@ -211,33 +193,21 @@ def safe_word_replace(o, c):
                     "original": orig[s:e],
                     "suggestion": "",
                 })
-            continue
 
     return diffs
 
-
 # -------------------------------------------------
-# APPLY ONLY SAFE DIFFS (PREVENTS WORD COMBINATIONS)
+# APPLY SAFE DIFFS
 # -------------------------------------------------
 
 def apply_diffs_to_text(original: str, diffs):
     text = original
-
     for d in sorted(diffs, key=lambda x: (x["start"], x["end"]), reverse=True):
-        s = int(d.get("start", 0))
-        e = int(d.get("end", s))
-        suggestion = d.get("suggestion", "")
-
-        if s < 0 or e < 0 or s > len(text) or e > len(text) or s > e:
-            continue
-
-        text = text[:s] + suggestion + text[e:]
-
+        text = text[:d["start"]] + d["suggestion"] + text[d["end"]:]
     return text
 
-
 # -------------------------------------------------
-# OPENAI CORRECTION
+# OPENAI
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
@@ -246,19 +216,15 @@ def correct_with_openai_no(text: str) -> str:
 
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
-            "VIKTIGE REGLER (MÅ FØLGES):\n"
-            "- IKKE legg til nye ord\n"
-            "- IKKE fjern ord\n"
-            "- IKKE endre rekkefølgen på ord\n"
-            "- IKKE slå sammen ord (f.eks. 'privat livet' -> 'privatlivet')\n"
-            "- IKKE del ord\n\n"
+            "REGLER:\n"
+            "- IKKE legg til eller fjern ord\n"
+            "- IKKE endre rekkefølge\n"
+            "- IKKE slå sammen eller dele ord\n\n"
             "Du kan rette:\n"
             "- stavefeil\n"
-            "- grammatikk (kun ved å endre eksisterende ord)\n"
-            "- bøyning (kun ved å endre eksisterende ord)\n"
+            "- bøyning\n"
             "- tegnsetting\n"
-            "- store og små bokstaver\n\n"
-            "Behold mening og stil.\n"
+            "- store/små bokstaver\n\n"
             "Returner KUN teksten."
         )
 
@@ -272,31 +238,20 @@ def correct_with_openai_no(text: str) -> str:
         )
 
         return (r.choices[0].message.content or "").strip() or text
-
     except Exception:
         logger.exception("OpenAI error")
         return text
 
-
 # -------------------------------------------------
-# MAIN VIEW
+# VIEW
 # -------------------------------------------------
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         original = unicodedata.normalize("NFC", request.POST.get("text", ""))
 
-        if not original.strip():
-            return JsonResponse({
-                "original_text": "",
-                "corrected_text": "",
-                "differences": [],
-                "error_count": 0,
-            })
-
-        raw_corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
-        diffs = find_differences_charwise(original, raw_corrected)
-
+        corrected_raw = correct_with_openai_no(original)
+        diffs = find_differences_charwise(original, corrected_raw)
         safe_corrected = apply_diffs_to_text(original, diffs)
 
         return JsonResponse({
@@ -308,15 +263,13 @@ def index(request):
 
     return render(request, "checker/index.html")
 
-
 # -------------------------------------------------
-# AUTH (UNCHANGED)
+# AUTH
 # -------------------------------------------------
 
 from django.contrib.auth.models import User
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
-
 
 def register(request):
     if request.method != "POST":
@@ -340,7 +293,6 @@ def register(request):
     login(request, user)
     return redirect("/")
 
-
 def login_view(request):
     if request.method != "POST":
         return redirect("/")
@@ -357,7 +309,6 @@ def login_view(request):
 
     login(request, user)
     return redirect("/")
-
 
 def logout_view(request):
     if request.method == "POST":
