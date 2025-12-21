@@ -223,19 +223,21 @@ def correct_with_openai_no(text: str) -> str:
         )
 
         corrected = (r.choices[0].message.content or "").strip()
-        if not corrected:
+
+        # -------------------------------------------------
+        # 🔒 HARD WHITESPACE SAFETY (THIS IS THE KEY)
+        # -------------------------------------------------
+        # If ANY whitespace changed → reject correction
+        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
+            logger.warning("Whitespace changed by model – rejecting correction")
             return text
 
-        # 🔒 FIX whitespace instead of rejecting everything
-        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            logger.warning("Whitespace changed by model – repairing whitespace")
-            corrected = restore_original_whitespace(text, corrected)
-
-        return corrected
+        return corrected or text
 
     except Exception:
         logger.exception("OpenAI error")
         return text
+
 
 
 # -------------------------------------------------
