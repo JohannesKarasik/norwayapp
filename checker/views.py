@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (SIMPLE, HARD LENGTH GUARD)
+# CHARWISE DIFF (SIMPLE, SAFE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,17 +62,53 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
+    def norm_word(tok: str) -> str:
+        return tok.lower().strip(".,;:!?")
+
     def safe_word_replace(o, c):
-        o0 = o.lower().strip(".,;:!?")
-        c0 = c.lower().strip(".,;:!?")
+        o0 = norm_word(o)
+        c0 = norm_word(c)
 
         if not o0 or not c0:
             return False
 
+        # Prevent "crazy" swaps
         if o0[0] != c0[0]:
             return False
 
         return difflib.SequenceMatcher(a=o0, b=c0).ratio() >= 0.88
+
+    def is_compound_join(o_tokens, i1, c_tok):
+        """
+        Blocks compound joins like:
+        'privat' + 'livet' -> 'privatlivet'
+        even if the diff comes out as a 1->1 replace.
+        """
+        c0 = norm_word(c_tok)
+        if not c0:
+            return False
+
+        cur = norm_word(o_tokens[i1]) if i1 < len(o_tokens) else ""
+        nxt = norm_word(o_tokens[i1 + 1]) if (i1 + 1) < len(o_tokens) else ""
+        prv = norm_word(o_tokens[i1 - 1]) if (i1 - 1) >= 0 else ""
+
+        # Only consider real words (not punctuation)
+        if not cur:
+            return False
+
+        # If corrected equals cur+nxt or prv+cur -> it's a join
+        if nxt and (cur + nxt) == c0:
+            return True
+        if prv and (prv + cur) == c0:
+            return True
+
+        # Also catch cases where it clearly starts/ends with neighbors
+        if nxt and c0.startswith(cur) and c0.endswith(nxt) and len(c0) > len(cur) and len(c0) > len(nxt):
+            return True
+        if prv and c0.startswith(prv) and c0.endswith(cur) and len(c0) > len(prv) and len(c0) > len(cur):
+            return True
+
+        return False
 
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
@@ -80,7 +116,7 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # Ignore joins / splits entirely (THIS blocks privat livet -> privatlivet)
+        # Ignore joins/splits entirely when they show up as multi-token changes
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -88,14 +124,15 @@ def find_differences_charwise(original: str, corrected: str):
             o_tok = o_tokens[i1]
             c_tok = c_tokens[j1]
 
+            # ✅ Block compound joins even if they appear as 1->1 replace
+            if is_compound_join(o_tokens, i1, c_tok):
+                continue
+
             if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
                 orig_span = orig[s:e]
 
-                # 🔒 ONLY RULE THAT MATTERS
-                if len(c_tok) > len(orig_span):
-                    continue
-
+                # ✅ Allow longer/shorter within the same token (job->jobb, syns->synes, etc.)
                 diffs.append({
                     "type": "replace",
                     "start": s,
@@ -136,14 +173,7 @@ def find_differences_charwise(original: str, corrected: str):
 # APPLY ONLY SAFE DIFFS (PREVENTS WORD COMBINATIONS)
 # -------------------------------------------------
 
-def apply_diffs_to_text(original: str, diffs: list[dict]) -> str:
-    """
-    Rebuild corrected text by applying ONLY the diffs we consider safe.
-    This guarantees:
-    - No word merges/splits
-    - No token order destruction
-    - corrected_text always matches the diff spans
-    """
+def apply_diffs_to_text(original: str, diffs):
     text = original
 
     # Apply from end -> start so indexes stay valid
@@ -166,8 +196,7 @@ def apply_diffs_to_text(original: str, diffs: list[dict]) -> str:
 
 def correct_with_openai_no(text: str) -> str:
     try:
-        # (Optional but recommended) Self-defensive whitespace collapse
-        # so your token mapping behaves predictably.
+        # Keep whitespace stable for better diffing
         text = re.sub(r"\s+", " ", text).strip()
 
         prompt = (
@@ -178,8 +207,10 @@ def correct_with_openai_no(text: str) -> str:
             "- IKKE endre rekkefølgen på ord\n"
             "- IKKE slå sammen ord (f.eks. 'privat livet' -> 'privatlivet')\n"
             "- IKKE del ord\n\n"
-            "Du kan kun rette:\n"
-            "- stavefeil innenfor samme ord\n"
+            "Du kan rette:\n"
+            "- stavefeil\n"
+            "- grammatikk (kun ved å endre eksisterende ord)\n"
+            "- bøyning (kun ved å endre eksisterende ord)\n"
             "- tegnsetting\n"
             "- store og små bokstaver\n\n"
             "Behold mening og stil.\n"
@@ -221,7 +252,7 @@ def index(request):
         raw_corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
         diffs = find_differences_charwise(original, raw_corrected)
 
-        # ✅ CRITICAL: only return a corrected text built from safe diffs
+        # Only return corrected text built from safe diffs (prevents order breaking)
         safe_corrected = apply_diffs_to_text(original, diffs)
 
         return JsonResponse({
