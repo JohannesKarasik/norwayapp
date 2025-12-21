@@ -169,11 +169,23 @@ def find_differences_charwise(original: str, corrected: str):
 def correct_with_openai_no(text: str) -> str:
     try:
         prompt = (
-            "Du er en profesjonell norsk språkvasker. "
-            "Returner teksten i perfekt grammatisk korrekt bokmål. "
-            "Rett stavefeil, bøyning, tegnsetting og kommatering. "
-            "Behold mening og stil. "
-            "Returner kun teksten."
+            "Du er en profesjonell norsk språkvasker.\n\n"
+
+            "ABSOLUTTE REGLER (MÅ FØLGES):\n"
+            "- IKKE legg til mellomrom\n"
+            "- IKKE fjern mellomrom\n"
+            "- IKKE slå sammen ord\n"
+            "- IKKE del ord\n"
+            "- IKKE endre linjeskift eller avsnitt\n\n"
+
+            "DU HAR LOV TIL Å RETTE:\n"
+            "- stavefeil inne i samme ord\n"
+            "- bøyningsfeil av samme ord\n"
+            "- tegnsetting (komma, punktum osv.)\n"
+            "- store og små bokstaver\n\n"
+
+            "Behold tekstens betydning, stil og tone uendret.\n"
+            "Returner KUN teksten, uten forklaring."
         )
 
         r = client.chat.completions.create(
