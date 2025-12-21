@@ -31,28 +31,33 @@ def tokenize_with_offsets(text: str):
 
 def correct_with_openai_no(text: str) -> str:
     """
-    Norwegian spellcheck ONLY.
-    No word order changes, no spacing changes,
-    no punctuation movement.
+    Produces a fully corrected Norwegian version of the input text:
+    - Fixes spelling, grammar, punctuation, capitalization, and comma errors
+    - Uses Norwegian startkomma rules
+    - Keeps meaning and tone identical
+    - Avoids stylistic rewriting
     """
     try:
         system_prompt = (
-            "Du er en ekstremt streng norsk språkkorrektør.\n\n"
+            "Du er en profesjonell norsk språkvasker.\n"
+            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt "
+            "og naturlig form på norsk bokmål.\n\n"
 
-            "ABSOLUTTE REGLER (MÅ FØLGES):\n"
-            "- IKKE legg til ord\n"
-            "- IKKE fjern ord\n"
-            "- IKKE endre rekkefølgen på ord\n"
-            "- IKKE del eller slå sammen ord\n"
-            "- IKKE flytt, legg til eller fjern tegnsetting\n"
-            "- IKKE endre mellomrom eller linjeskift\n\n"
+            "DU SKAL RETTE:\n"
+            "- stavefeil\n"
+            "- grammatikkfeil\n"
+            "- bøyningsfeil\n"
+            "- tegnsetting\n"
+            "- kommatering (inkludert startkomma før leddsetninger)\n"
+            "- store og små bokstaver\n\n"
 
-            "DU HAR KUN LOV TIL Å:\n"
-            "- rette rene stavefeil inne i samme ord\n"
-            "- rette små bøyningsfeil av samme ord\n\n"
+            "REGLER:\n"
+            "- Behold tekstens betydning, stil og tone\n"
+            "- Ikke legg til nye setninger\n"
+            "- Ikke fjern innhold\n"
+            "- Ikke bruk utropstegn eller stilistiske forbedringer\n\n"
 
-            "HVIS DU ER I TVIL → IKKE ENDRE.\n\n"
-            "Returner KUN teksten, uten forklaring."
+            "Returner KUN den korrigerte teksten, uten forklaring."
         )
 
         resp = client.chat.completions.create(
@@ -64,13 +69,7 @@ def correct_with_openai_no(text: str) -> str:
             temperature=0,
         )
 
-        corrected = (resp.choices[0].message.content or "")
-
-        # HARD SAFETY: token count must match
-        if len(tokenize_with_offsets(text)) != len(tokenize_with_offsets(corrected)):
-            logger.warning("Token count mismatch – disabling correction")
-            return text
-
+        corrected = (resp.choices[0].message.content or "").strip()
         return corrected if corrected else text
 
     except Exception:
