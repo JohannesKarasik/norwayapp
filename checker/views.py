@@ -26,7 +26,7 @@ if not openai.api_key:
     print("⚠ OPENAI_API_KEY is missing. Expected at:", ENV_PATH)
 
 # Keep for later comma work if needed
-fixer = PunctFixer(language="no")
+
 
 from openai import OpenAI
 client = OpenAI()
