@@ -128,74 +128,29 @@ def find_differences_charwise(original: str, corrected: str):
 # -------------------------------------------------
 def correct_with_openai_no(text: str) -> str:
     try:
-        base_prompt = (
-            "Du er en profesjonell norsk språkvasker.\n"
-            "Returner teksten i korrekt norsk bokmål.\n\n"
-            "Du kan rette:\n"
+        prompt = (
+            "Du er en profesjonell norsk språkvasker.\n\n"
+            "IKKE slå sammen eller del ord.\n"
+            "IKKE endre rekkefølge på ord.\n\n"
+            "Du har lov til å rette:\n"
             "- stavefeil\n"
             "- grammatikk\n"
             "- bøyning\n"
             "- tegnsetting\n"
             "- store og små bokstaver\n\n"
-            "Behold betydning og stil.\n"
             "Returner KUN teksten."
         )
 
-        strict_prompt = (
-            "Du er en ekstremt streng norsk språkkorrektør.\n\n"
-            "ABSOLUTTE REGLER:\n"
-            "- IKKE legg til mellomrom\n"
-            "- IKKE fjern mellomrom\n"
-            "- IKKE slå sammen ord\n"
-            "- IKKE del ord\n"
-            "- IKKE endre rekkefølge på ord\n\n"
-            "Du har KUN lov til å rette:\n"
-            "- stavefeil inne i samme ord\n"
-            "- små bøyningsfeil\n"
-            "- tegnsetting\n"
-            "- store/små bokstaver\n\n"
-            "Returner KUN teksten."
-        )
-
-        # ---- PASS 1: full correction
-        r1 = client.chat.completions.create(
+        r = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": base_prompt},
+                {"role": "system", "content": prompt},
                 {"role": "user", "content": text},
             ],
             temperature=0,
         )
 
-        corrected = (r1.choices[0].message.content or "").strip()
-        if not corrected:
-            return text
-
-        # ---- WHITESPACE CHECK
-        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            # ---- PASS 2: STRICT MODE
-            r2 = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": strict_prompt},
-                    {"role": "user", "content": text},
-                ],
-                temperature=0,
-            )
-
-            strict_corrected = (r2.choices[0].message.content or "").strip()
-
-            # 🔒 FINAL HARD RULE
-            if not strict_corrected:
-                return text
-
-            if re.sub(r"\S", "", strict_corrected) != re.sub(r"\S", "", text):
-                logger.warning("Whitespace change detected – skipping corrections")
-                return text
-
-            return strict_corrected
-
-        return corrected
+        return (r.choices[0].message.content or "").strip() or text
 
     except Exception:
         logger.exception("OpenAI error")
