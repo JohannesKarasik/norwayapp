@@ -4,18 +4,14 @@ from openai import OpenAI
 import logging
 import re
 import difflib
+import unicodedata
 
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
 # -----------------------------
-# Tokenization (alignment-safe)
+# Charwise diff (same style as Danish)
 # -----------------------------
-
-
-import re
-import difflib
-import unicodedata
 
 def find_differences_charwise(original: str, corrected: str):
     diffs_out = []
@@ -102,61 +98,69 @@ def find_differences_charwise(original: str, corrected: str):
 
     return diffs_out
 
+
 # -----------------------------
-# OpenAI correction (SAFE MODE)
+# OpenAI correction (NOW same logic as Danish)
 # -----------------------------
 
 def correct_with_openai_no(text: str) -> str:
     """
-    Produces a fully corrected Norwegian version of the input text:
+    Produces a fully corrected Norwegian (Bokmål) version of the input text:
     - Fixes spelling, grammar, punctuation, capitalization, and comma errors
-    - Uses Norwegian startkomma rules
-    - Keeps meaning and tone identical
-    - Avoids stylistic rewriting
+    - Keeps tone and meaning identical
+    - Avoids stylistic rewriting or added exclamation marks
+    Uses the SAME retry pattern as the Danish version.
     """
     try:
-        system_prompt = (
-            "Du er en profesjonell norsk språkvasker.\n"
-            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt "
-            "og naturlig form på norsk bokmål.\n\n"
-
-            "DU SKAL RETTE:\n"
-            "- stavefeil\n"
-            "- grammatikkfeil\n"
-            "- bøyningsfeil\n"
-            "- tegnsetting\n"
-            "- kommatering (inkludert startkomma før leddsetninger)\n"
-            "- store og små bokstaver\n\n"
-
-            "REGLER:\n"
-            "- Behold tekstens betydning, stil og tone\n"
-            "- Ikke legg til nye setninger\n"
-            "- Ikke fjern innhold\n"
-            "- Ikke bruk utropstegn eller stilistiske forbedringer\n\n"
-
-            "Returner KUN den korrigerte teksten, uten forklaring."
+        base_prompt = (
+            "Du er en profesjonell norsk språkvasker. "
+            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt, "
+            "og naturlig form på norsk bokmål. "
+            "Du skal rette ALLE feil i stavning, bøyning, grammatikk, ordstilling, "
+            "store bokstaver, mellomrom, og tegnsetting, og særlig kommatering. "
+            "Ret også komma etter reglene for startkomma (komma før leddsetninger) "
+            "samt komma mellom sideordnede setninger. "
+            "Behold tekstens betydning, stil og tone uendret. "
+            "Ikke legg til ekstra ord, tegn eller utropstegn. "
+            "Returner KUN den korrigerte teksten uten noen forklaring."
         )
 
+        # First attempt
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": base_prompt},
                 {"role": "user", "content": text},
             ],
             temperature=0,
         )
-
         corrected = (resp.choices[0].message.content or "").strip()
+
+        # If the text barely changed, retry with stronger emphasis (same pattern as Danish)
+        if corrected.strip() == text.strip():
+            print("⚠ No change detected – retrying with stricter correction mode...")
+            resp2 = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": base_prompt
+                        + " Hvis du er i tvil, så rett heller for mye enn for lite. "
+                          "Finn ALLE feil, også små komma- og formuleringsfeil."
+                    },
+                    {"role": "user", "content": text},
+                ],
+                temperature=0,
+            )
+            corrected2 = (resp2.choices[0].message.content or "").strip()
+            if corrected2:
+                corrected = corrected2
+
         return corrected if corrected else text
 
     except Exception:
         logger.exception("OpenAI error")
         return text
-
-
-# -----------------------------
-# Token-wise diff (bulletproof)
-# -----------------------------
 
 
 # -----------------------------
