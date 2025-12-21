@@ -1,7 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
-from punctfix import PunctFixer
-from docx import Document
+
 from io import BytesIO
 import openai
 import os
@@ -9,20 +8,17 @@ import re
 import difflib
 import unicodedata
 from pathlib import Path
-from dotenv import load_dotenv
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.conf import settings
-import stripe
-
 # ---------------------------
 # Load the correct .env file
 # ---------------------------
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / "punctuation_fixer" / ".env"
-load_dotenv(ENV_PATH)
+
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
