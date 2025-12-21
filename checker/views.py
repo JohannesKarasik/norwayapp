@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (UNCHANGED, SAFE)
+# CHARWISE DIFF (SAFE, WHITESPACE-AWARE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -73,31 +73,48 @@ def find_differences_charwise(original: str, corrected: str):
 
         return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.88
 
+    def changes_whitespace(a: str, b: str) -> bool:
+        return re.sub(r"\S", "", a) != re.sub(r"\S", "", b)
+
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             continue
 
-        # Ignore join/split completely
+        # -------------------------------------------------
+        # IGNORE join/split (multi-token replace)
+        # -------------------------------------------------
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
+        # -------------------------------------------------
+        # SINGLE WORD REPLACE (NO WHITESPACE CHANGE)
+        # -------------------------------------------------
         if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
 
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
+                original_slice = orig[s:e]
+
+                # 🚫 Skip if whitespace would change
+                if changes_whitespace(original_slice, c):
+                    continue
+
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig[s:e],
+                    "original": original_slice,
                     "suggestion": c,
                 })
             continue
 
+        # -------------------------------------------------
+        # INSERT punctuation only
+        # -------------------------------------------------
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
@@ -109,6 +126,9 @@ def find_differences_charwise(original: str, corrected: str):
                     "suggestion": c_tokens[j1],
                 })
 
+        # -------------------------------------------------
+        # DELETE punctuation only
+        # -------------------------------------------------
         if tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
@@ -124,8 +144,9 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (DANISH TWO-PASS SYSTEM)
+# OPENAI CORRECTION (DANISH STYLE)
 # -------------------------------------------------
+
 def correct_with_openai_no(text: str) -> str:
     try:
         prompt = (
