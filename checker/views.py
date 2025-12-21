@@ -65,18 +65,69 @@ def find_differences_charwise(original: str, corrected: str):
     def norm_word(tok: str) -> str:
         return tok.lower().strip(".,;:!?")
 
+    def levenshtein(a: str, b: str) -> int:
+        """Small, fast Levenshtein for short tokens."""
+        if a == b:
+            return 0
+        if not a:
+            return len(b)
+        if not b:
+            return len(a)
+
+        # Ensure a is shorter
+        if len(a) > len(b):
+            a, b = b, a
+
+        prev = list(range(len(b) + 1))
+        for i, ca in enumerate(a, start=1):
+            cur = [i]
+            for j, cb in enumerate(b, start=1):
+                ins = cur[j - 1] + 1
+                dele = prev[j] + 1
+                sub = prev[j - 1] + (ca != cb)
+                cur.append(min(ins, dele, sub))
+            prev = cur
+        return prev[-1]
+
     def safe_word_replace(o, c):
+        """
+        Allow real spelling/inflection fixes while preventing wild swaps.
+        Key: short words need looser thresholds (dt->det, de->dem, job->jobb).
+        """
         o0 = norm_word(o)
         c0 = norm_word(c)
 
         if not o0 or not c0:
             return False
+        if o0 == c0:
+            return False
 
-        # Prevent "crazy" swaps
+        # Do not allow completely different starting letters (prevents many bad swaps).
+        # (This also blocks og -> å, which is grammatical rather than "spelling".)
         if o0[0] != c0[0]:
             return False
 
-        return difflib.SequenceMatcher(a=o0, b=c0).ratio() >= 0.88
+        L = max(len(o0), len(c0))
+
+        # Extra-safe allowlist patterns for common spelling expansions
+        # job -> jobb, etc.
+        if len(c0) == len(o0) + 1 and c0[:-1] == o0 and c0[-1] == o0[-1]:
+            return True
+
+        # Prefix expansion/contraction (det <-> dt won't match, but other common ones will)
+        if (c0.startswith(o0) or o0.startswith(c0)) and abs(len(o0) - len(c0)) <= 2 and L <= 6:
+            return True
+
+        # Levenshtein-based acceptance (very good for short tokens)
+        dist = levenshtein(o0, c0)
+        if L <= 3:
+            return dist <= 1  # dt->det (dist 1), de->dem (dist 1)
+        if L <= 5:
+            return dist <= 1
+
+        # For longer words, require strong similarity
+        ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
+        return ratio >= 0.88
 
     def is_compound_join(o_tokens, i1, c_tok):
         """
@@ -92,17 +143,14 @@ def find_differences_charwise(original: str, corrected: str):
         nxt = norm_word(o_tokens[i1 + 1]) if (i1 + 1) < len(o_tokens) else ""
         prv = norm_word(o_tokens[i1 - 1]) if (i1 - 1) >= 0 else ""
 
-        # Only consider real words (not punctuation)
         if not cur:
             return False
 
-        # If corrected equals cur+nxt or prv+cur -> it's a join
         if nxt and (cur + nxt) == c0:
             return True
         if prv and (prv + cur) == c0:
             return True
 
-        # Also catch cases where it clearly starts/ends with neighbors
         if nxt and c0.startswith(cur) and c0.endswith(nxt) and len(c0) > len(cur) and len(c0) > len(nxt):
             return True
         if prv and c0.startswith(prv) and c0.endswith(cur) and len(c0) > len(prv) and len(c0) > len(cur):
@@ -124,15 +172,13 @@ def find_differences_charwise(original: str, corrected: str):
             o_tok = o_tokens[i1]
             c_tok = c_tokens[j1]
 
-            # ✅ Block compound joins even if they appear as 1->1 replace
+            # Block compound joins even if they appear as 1->1 replace
             if is_compound_join(o_tokens, i1, c_tok):
                 continue
 
             if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
                 orig_span = orig[s:e]
-
-                # ✅ Allow longer/shorter within the same token (job->jobb, syns->synes, etc.)
                 diffs.append({
                     "type": "replace",
                     "start": s,
@@ -176,7 +222,6 @@ def find_differences_charwise(original: str, corrected: str):
 def apply_diffs_to_text(original: str, diffs):
     text = original
 
-    # Apply from end -> start so indexes stay valid
     for d in sorted(diffs, key=lambda x: (x["start"], x["end"]), reverse=True):
         s = int(d.get("start", 0))
         e = int(d.get("end", s))
@@ -196,7 +241,6 @@ def apply_diffs_to_text(original: str, diffs):
 
 def correct_with_openai_no(text: str) -> str:
     try:
-        # Keep whitespace stable for better diffing
         text = re.sub(r"\s+", " ", text).strip()
 
         prompt = (
@@ -252,7 +296,6 @@ def index(request):
         raw_corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
         diffs = find_differences_charwise(original, raw_corrected)
 
-        # Only return corrected text built from safe diffs (prevents order breaking)
         safe_corrected = apply_diffs_to_text(original, diffs)
 
         return JsonResponse({
