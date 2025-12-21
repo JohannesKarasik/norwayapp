@@ -126,7 +126,6 @@ def find_differences_charwise(original: str, corrected: str):
 # -------------------------------------------------
 # OPENAI CORRECTION (DANISH TWO-PASS SYSTEM)
 # -------------------------------------------------
-
 def correct_with_openai_no(text: str) -> str:
     try:
         base_prompt = (
@@ -158,7 +157,7 @@ def correct_with_openai_no(text: str) -> str:
             "Returner KUN teksten."
         )
 
-                # ---- PASS 1: full correction
+        # ---- PASS 1: full correction
         r1 = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -186,12 +185,11 @@ def correct_with_openai_no(text: str) -> str:
 
             strict_corrected = (r2.choices[0].message.content or "").strip()
 
-            # 🔒 FINAL HARD RULE (THIS WAS MISSING)
+            # 🔒 FINAL HARD RULE
             if not strict_corrected:
                 return text
 
             if re.sub(r"\S", "", strict_corrected) != re.sub(r"\S", "", text):
-                # ❌ whitespace still changed → IGNORE ALL CORRECTIONS
                 logger.warning("Whitespace change detected – skipping corrections")
                 return text
 
@@ -199,6 +197,9 @@ def correct_with_openai_no(text: str) -> str:
 
         return corrected
 
+    except Exception:
+        logger.exception("OpenAI error")
+        return text
 
 
 # -------------------------------------------------
