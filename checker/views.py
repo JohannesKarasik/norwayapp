@@ -80,7 +80,7 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # Ignore joins / splits entirely
+        # Ignore joins / splits entirely (THIS blocks privat livet -> privatlivet)
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -133,17 +133,53 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (UNCHANGED)
+# APPLY ONLY SAFE DIFFS (PREVENTS WORD COMBINATIONS)
+# -------------------------------------------------
+
+def apply_diffs_to_text(original: str, diffs: list[dict]) -> str:
+    """
+    Rebuild corrected text by applying ONLY the diffs we consider safe.
+    This guarantees:
+    - No word merges/splits
+    - No token order destruction
+    - corrected_text always matches the diff spans
+    """
+    text = original
+
+    # Apply from end -> start so indexes stay valid
+    for d in sorted(diffs, key=lambda x: (x["start"], x["end"]), reverse=True):
+        s = int(d.get("start", 0))
+        e = int(d.get("end", s))
+        suggestion = d.get("suggestion", "")
+
+        if s < 0 or e < 0 or s > len(text) or e > len(text) or s > e:
+            continue
+
+        text = text[:s] + suggestion + text[e:]
+
+    return text
+
+
+# -------------------------------------------------
+# OPENAI CORRECTION
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
     try:
+        # (Optional but recommended) Self-defensive whitespace collapse
+        # so your token mapping behaves predictably.
+        text = re.sub(r"\s+", " ", text).strip()
+
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
-            "Du kan rette:\n"
-            "- stavefeil\n"
-            "- grammatikk\n"
-            "- bøyning\n"
+            "VIKTIGE REGLER (MÅ FØLGES):\n"
+            "- IKKE legg til nye ord\n"
+            "- IKKE fjern ord\n"
+            "- IKKE endre rekkefølgen på ord\n"
+            "- IKKE slå sammen ord (f.eks. 'privat livet' -> 'privatlivet')\n"
+            "- IKKE del ord\n\n"
+            "Du kan kun rette:\n"
+            "- stavefeil innenfor samme ord\n"
             "- tegnsetting\n"
             "- store og små bokstaver\n\n"
             "Behold mening og stil.\n"
@@ -182,12 +218,15 @@ def index(request):
                 "error_count": 0,
             })
 
-        corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
-        diffs = find_differences_charwise(original, corrected)
+        raw_corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
+        diffs = find_differences_charwise(original, raw_corrected)
+
+        # ✅ CRITICAL: only return a corrected text built from safe diffs
+        safe_corrected = apply_diffs_to_text(original, diffs)
 
         return JsonResponse({
             "original_text": original,
-            "corrected_text": corrected,
+            "corrected_text": safe_corrected,
             "differences": diffs,
             "error_count": len(diffs),
         })
