@@ -146,6 +146,49 @@ def find_differences_charwise(original: str, corrected: str):
                     })
             continue
 
+            # -----------------------------
+    # MERGE ADJACENT JOIN DIFFS
+    # (e.g. "privat livet" -> "privatlivet")
+    # -----------------------------
+
+    merged = []
+    i = 0
+    while i < len(diffs_out):
+        d = diffs_out[i]
+
+        # look ahead one diff
+        if (
+            i + 1 < len(diffs_out)
+            and d["type"] == "replace"
+            and diffs_out[i + 1]["type"] == "replace"
+            and d["end"] + 1 >= diffs_out[i + 1]["start"]  # touching / adjacent
+        ):
+            d2 = diffs_out[i + 1]
+
+            combined_original = orig_text[d["start"]:d2["end"]]
+            combined_suggestion = d["suggestion"] + d2["suggestion"]
+
+            # core-compare without spaces/punctuation
+            def core(s):
+                return re.sub(r"[\W_]+", "", s.lower())
+
+            if core(combined_original) == core(combined_suggestion):
+                merged.append({
+                    "type": "replace",
+                    "start": d["start"],
+                    "end": d2["end"],
+                    "original": combined_original,
+                    "suggestion": combined_suggestion,
+                })
+                i += 2
+                continue
+
+        merged.append(d)
+        i += 1
+
+    return merged
+
+
     return diffs_out
 
 
