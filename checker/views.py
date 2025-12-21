@@ -197,11 +197,22 @@ def correct_with_openai_no(text: str) -> str:
             temperature=0,
         )
 
-        return (r.choices[0].message.content or "").strip() or text
+        corrected = (r.choices[0].message.content or "").strip()
+
+        # -------------------------------------------------
+        # 🔒 HARD WHITESPACE SAFETY (THIS IS THE KEY)
+        # -------------------------------------------------
+        # If ANY whitespace changed → reject correction
+        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
+            logger.warning("Whitespace changed by model – rejecting correction")
+            return text
+
+        return corrected or text
 
     except Exception:
         logger.exception("OpenAI error")
         return text
+
 
 
 # -------------------------------------------------
