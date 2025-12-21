@@ -22,10 +22,6 @@ def find_differences_charwise(original: str, corrected: str):
     orig = unicodedata.normalize("NFC", original)
     corr = unicodedata.normalize("NFC", corrected)
 
-    # -------------------------------------------------
-    # TOKENIZE
-    # -------------------------------------------------
-
     def merge_punct(tokens):
         out = []
         for t in tokens:
@@ -37,10 +33,6 @@ def find_differences_charwise(original: str, corrected: str):
 
     o_tokens = merge_punct(TOKEN_RE.findall(orig))
     c_tokens = merge_punct(TOKEN_RE.findall(corr))
-
-    # -------------------------------------------------
-    # MAP TOKEN → CHAR POSITIONS (FAIL-SAFE)
-    # -------------------------------------------------
 
     def map_positions(text, tokens):
         pos = []
@@ -57,11 +49,7 @@ def find_differences_charwise(original: str, corrected: str):
     c_pos = map_positions(corr, c_tokens)
 
     if o_pos is None or c_pos is None:
-        return []  # never guess
-
-    # -------------------------------------------------
-    # HELPERS
-    # -------------------------------------------------
+        return []
 
     def span(pos, a, b):
         if a >= len(pos):
@@ -70,26 +58,14 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def core(s):
-        # remove spaces + punctuation → handles "privat livet" == "privatlivet"
-        return re.sub(r"[\W_]+", "", s.lower())
-
     def safe_word_replace(a, b):
         a0 = a.lower().strip(".,;:!?")
         b0 = b.lower().strip(".,;:!?")
-
         if not a0 or not b0:
             return False
-
-        # HARD RULES (kill drift)
         if a0[0] != b0[0]:
             return False
-
         return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.9
-
-    # -------------------------------------------------
-    # DIFF
-    # -------------------------------------------------
 
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
@@ -98,27 +74,14 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # -------------------------------------------------
-# -------------------------------------------------
-# IGNORE JOIN / SPLIT (SPACE REMOVAL / INSERTION)
-        # -------------------------------------------------
-        if tag == "replace" and max(i2 - i1, j2 - j1) <= 3:
-            o_chunk = orig[span(o_pos, i1, i2)[0]:span(o_pos, i1, i2)[1]]
-            c_chunk = corr[span(c_pos, j1, j2)[0]:span(c_pos, j1, j2)[1]]
+        # IGNORE any join/split (space changes)
+        if tag == "replace" and max(i2 - i1, j2 - j1) > 1:
+            continue
 
-            # If this is only a space removal/addition (compound word),
-            # we ignore it completely to avoid bad suggestions.
-            if core(o_chunk) == core(c_chunk):
-                continue
-
-
-        # -------------------------------------------------
-        # SINGLE WORD REPLACE (VERY STRICT)
-        # -------------------------------------------------
+        # SINGLE WORD REPLACE (strict)
         if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
             o = o_tokens[i1]
             c = c_tokens[j1]
-
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
                 diffs.append({
@@ -130,9 +93,7 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
-        # -------------------------------------------------
-        # INSERT / DELETE → punctuation ONLY
-        # -------------------------------------------------
+        # INSERT punctuation only
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
@@ -145,8 +106,9 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
+        # DELETE punctuation only
         if tag == "delete" and (i2 - i1) == 1:
-            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]) or len(o_tokens[i1]) <= 2:
+            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
                 diffs.append({
                     "type": "delete",
@@ -157,14 +119,17 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
-        # EVERYTHING ELSE → IGNORE (no red explosion)
-
     return diffs
+
+
+# -------------------------------------------------
+# WHITESPACE REPAIR (CRITICAL)
+# -------------------------------------------------
 
 def restore_original_whitespace(original: str, corrected: str) -> str:
     """
-    Keeps characters from corrected, but forces whitespace
-    (spaces, newlines, tabs) to match the original exactly.
+    Keeps corrected characters but forces whitespace
+    (spaces, tabs, newlines) to match the original exactly.
     """
     out = []
     i = j = 0
@@ -180,37 +145,29 @@ def restore_original_whitespace(original: str, corrected: str) -> str:
             i += 1
             j += 1
 
-    # append remaining original whitespace if any
     while i < len(original):
         out.append(original[i])
         i += 1
 
     return "".join(out)
 
+
 # -------------------------------------------------
-# OPENAI CORRECTION (UNCHANGED)
+# OPENAI CORRECTION
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
     try:
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
-
-            "ABSOLUTTE REGLER (MÅ FØLGES):\n"
-            "- IKKE legg til mellomrom\n"
-            "- IKKE fjern mellomrom\n"
-            "- IKKE slå sammen ord\n"
-            "- IKKE del ord\n"
-            "- IKKE endre linjeskift eller avsnitt\n\n"
-
-            "DU HAR LOV TIL Å RETTE:\n"
+            "IKKE legg til eller fjern mellomrom.\n"
+            "IKKE slå sammen eller del ord.\n\n"
+            "Du HAR lov til å rette:\n"
             "- stavefeil inne i samme ord\n"
-            "- bøyningsfeil av samme ord\n"
-            "- tegnsetting (komma, punktum osv.)\n"
+            "- bøyningsfeil\n"
+            "- tegnsetting\n"
             "- store og små bokstaver\n\n"
-
-            "Behold tekstens betydning, stil og tone uendret.\n"
-            "Returner KUN teksten, uten forklaring."
+            "Returner KUN teksten."
         )
 
         r = client.chat.completions.create(
@@ -223,21 +180,18 @@ def correct_with_openai_no(text: str) -> str:
         )
 
         corrected = (r.choices[0].message.content or "").strip()
-
-        # -------------------------------------------------
-        # 🔒 HARD WHITESPACE SAFETY (THIS IS THE KEY)
-        # -------------------------------------------------
-        # If ANY whitespace changed → reject correction
-        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            logger.warning("Whitespace changed by model – rejecting correction")
+        if not corrected:
             return text
 
-        return corrected or text
+        # 🔒 enforce original whitespace but keep other fixes
+        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
+            corrected = restore_original_whitespace(text, corrected)
+
+        return corrected
 
     except Exception:
         logger.exception("OpenAI error")
         return text
-
 
 
 # -------------------------------------------------
@@ -246,9 +200,7 @@ def correct_with_openai_no(text: str) -> str:
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        original = request.POST.get("text", "")
-
-        original = unicodedata.normalize("NFC", original)
+        original = unicodedata.normalize("NFC", request.POST.get("text", ""))
 
         if not original.strip():
             return JsonResponse({
@@ -259,7 +211,6 @@ def index(request):
             })
 
         corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
-
         diffs = find_differences_charwise(original, corrected)
 
         return JsonResponse({
