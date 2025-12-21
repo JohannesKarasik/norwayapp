@@ -25,6 +25,8 @@ def find_differences_charwise(original: str, corrected: str):
     orig_text = unicodedata.normalize("NFC", original)
     corr_text = unicodedata.normalize("NFC", corrected)
 
+    TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
+
     def merge_punctuation(tokens):
         merged = []
         for tok in tokens:
@@ -43,7 +45,6 @@ def find_differences_charwise(original: str, corrected: str):
         for tok in tokens:
             start = text.find(tok, cursor)
             if start == -1:
-                # If we can't map cleanly, bail out safely (no highlights)
                 return None
             end = start + len(tok)
             positions.append((start, end))
@@ -55,25 +56,22 @@ def find_differences_charwise(original: str, corrected: str):
     if orig_positions is None or corr_positions is None:
         return []
 
-    def span_for_range(positions, i_start, i_end_exclusive, text_len):
+    def span_for_range(positions, i_start, i_end):
         if i_start >= len(positions):
-            return text_len, text_len
-        if i_start == i_end_exclusive:
-            start_i, _ = positions[i_start]
-            return start_i, start_i
-        return positions[i_start][0], positions[i_end_exclusive - 1][1]
+            return len(orig_text), len(orig_text)
+        if i_start == i_end:
+            s, _ = positions[i_start]
+            return s, s
+        return positions[i_start][0], positions[i_end - 1][1]
 
-    def text_for_range(text, positions, i_start, i_end_exclusive):
-        s, e = span_for_range(positions, i_start, i_end_exclusive, len(text))
+    def text_for_range(text, positions, i_start, i_end):
+        s, e = span_for_range(positions, i_start, i_end)
         return text[s:e], s, e
 
     def core(s: str) -> str:
-        # remove spaces + punctuation/hyphens so "privat livet." == "privatlivet."
-        s = s.lower()
-        return re.sub(r"[\s\.,;:!?\-–—\"'“”‘’()\[\]{}]", "", s)
+        return re.sub(r"[\W_]+", "", s.lower())
 
     def tokens_are_small_edit(a, b):
-        # original behavior, just slightly safer against drift
         if a.lower().strip(",.;:!?") == b.lower().strip(",.;:!?"):
             return True
         return difflib.SequenceMatcher(a=a.lower(), b=b.lower()).ratio() >= 0.7
@@ -82,112 +80,77 @@ def find_differences_charwise(original: str, corrected: str):
         return bool(re.fullmatch(r"[,.:;!?]+", tok))
 
     sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
+
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             continue
 
-        if tag == "replace":
-            # Case A: 1-to-1 small edit (spelling / punctuation attached to a word)
-            if (i2 - i1) == 1 and (j2 - j1) == 1:
-                o = orig_tokens[i1]
-                c = corr_tokens[j1]
-                if tokens_are_small_edit(o, c):
-                    _, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-                    diffs_out.append({
-                        "type": "replace",
-                        "start": s,
-                        "end": e,
-                        "original": orig_text[s:e],
-                        "suggestion": c,
-                    })
-                continue
+        # -----------------------------
+        # JOIN / SPLIT (privat livet -> privatlivet)
+        # -----------------------------
+        if tag == "replace" and max(i2 - i1, j2 - j1) <= 3:
+            orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+            corr_chunk, _, _ = text_for_range(corr_text, corr_positions, j1, j2)
 
-            # Case B: join/split (e.g. "privat livet" <-> "privatlivet")
-            # allow up to 3 tokens on either side to keep it tight/safe
-            if max(i2 - i1, j2 - j1) <= 3:
-                orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-                corr_chunk, _, _ = text_for_range(corr_text, corr_positions, j1, j2)
-
-                if core(orig_chunk) == core(corr_chunk):
-                    diffs_out.append({
-                        "type": "replace",
-                        "start": s,
-                        "end": e,
-                        "original": orig_chunk,
-                        "suggestion": corr_chunk,
-                    })
-            continue
-
-        elif tag == "delete":
-            if (i2 - i1) == 1:
-                o = orig_tokens[i1]
-                if is_pure_punctuation(o) or len(o) <= 2:
-                    orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
-                    diffs_out.append({
-                        "type": "delete",
-                        "start": s,
-                        "end": e,
-                        "original": orig_chunk,
-                        "suggestion": "",
-                    })
-            continue
-
-        elif tag == "insert":
-            if (j2 - j1) == 1:
-                c = corr_tokens[j1]
-                if is_pure_punctuation(c):
-                    _, s, _ = text_for_range(orig_text, orig_positions, i1, i1)
-                    diffs_out.append({
-                        "type": "insert",
-                        "start": s,
-                        "end": s,
-                        "original": "",
-                        "suggestion": c,
-                    })
-            continue
-
-            # -----------------------------
-    # MERGE ADJACENT JOIN DIFFS
-    # (e.g. "privat livet" -> "privatlivet")
-    # -----------------------------
-
-    merged = []
-    i = 0
-    while i < len(diffs_out):
-        d = diffs_out[i]
-
-        # look ahead one diff
-        if (
-            i + 1 < len(diffs_out)
-            and d["type"] == "replace"
-            and diffs_out[i + 1]["type"] == "replace"
-            and d["end"] + 1 >= diffs_out[i + 1]["start"]  # touching / adjacent
-        ):
-            d2 = diffs_out[i + 1]
-
-            combined_original = orig_text[d["start"]:d2["end"]]
-            combined_suggestion = d["suggestion"] + d2["suggestion"]
-
-            # core-compare without spaces/punctuation
-            def core(s):
-                return re.sub(r"[\W_]+", "", s.lower())
-
-            if core(combined_original) == core(combined_suggestion):
-                merged.append({
+            if core(orig_chunk) == core(corr_chunk):
+                diffs_out.append({
                     "type": "replace",
-                    "start": d["start"],
-                    "end": d2["end"],
-                    "original": combined_original,
-                    "suggestion": combined_suggestion,
+                    "start": s,
+                    "end": e,
+                    "original": orig_chunk,
+                    "suggestion": corr_chunk,
                 })
-                i += 2
-                continue
+                continue  # ⛔ DO NOT emit smaller diffs
 
-        merged.append(d)
-        i += 1
+        # -----------------------------
+        # 1 → 1 SMALL EDITS
+        # -----------------------------
+        if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
+            o = orig_tokens[i1]
+            c = corr_tokens[j1]
 
-    return merged
+            if tokens_are_small_edit(o, c):
+                _, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+                diffs_out.append({
+                    "type": "replace",
+                    "start": s,
+                    "end": e,
+                    "original": orig_text[s:e],
+                    "suggestion": c,
+                })
+            continue
 
+        # -----------------------------
+        # DELETE (small / punctuation)
+        # -----------------------------
+        if tag == "delete" and (i2 - i1) == 1:
+            o = orig_tokens[i1]
+            if is_pure_punctuation(o) or len(o) <= 2:
+                orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+                diffs_out.append({
+                    "type": "delete",
+                    "start": s,
+                    "end": e,
+                    "original": orig_chunk,
+                    "suggestion": "",
+                })
+            continue
+
+        # -----------------------------
+        # INSERT (punctuation only)
+        # -----------------------------
+        if tag == "insert" and (j2 - j1) == 1:
+            c = corr_tokens[j1]
+            if is_pure_punctuation(c):
+                _, s, _ = text_for_range(orig_text, orig_positions, i1, i1)
+                diffs_out.append({
+                    "type": "insert",
+                    "start": s,
+                    "end": s,
+                    "original": "",
+                    "suggestion": c,
+                })
+            continue
 
     return diffs_out
 
