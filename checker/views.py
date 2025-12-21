@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (DANISH-GRADE, WHITESPACE SAFE)
+# CHARWISE DIFF (WHITESPACE-SAFE, DANISH STYLE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,26 +62,24 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def strip_spaces(s: str) -> str:
-        return re.sub(r"\s+", "", s)
+    def whitespace_changed(o, c):
+        return re.sub(r"\s+", "", o) == re.sub(r"\s+", "", c) and o != c
 
-    def safe_word_replace(original_word, corrected_word):
-        o = original_word.lower().strip(".,;:!?")
-        c = corrected_word.lower().strip(".,;:!?")
+    def safe_word_replace(o, c):
+        o0 = o.lower().strip(".,;:!?")
+        c0 = c.lower().strip(".,;:!?")
 
-        if not o or not c:
+        if not o0 or not c0:
             return False
 
-        # 🔒 HARD DANISH RULE:
-        # removing spaces must NOT change character sequence
-        if strip_spaces(o) != strip_spaces(c):
+        # 🚫 ignore whitespace-only changes (compound merges)
+        if whitespace_changed(o0, c0):
             return False
 
-        # normal similarity check
-        if o[0] != c[0]:
+        if o0[0] != c0[0]:
             return False
 
-        return difflib.SequenceMatcher(a=o, b=c).ratio() >= 0.88
+        return difflib.SequenceMatcher(a=o0, b=c0).ratio() >= 0.88
 
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
@@ -89,7 +87,7 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # 🚫 ignore joins/splits entirely
+        # Ignore multi-token replaces (joins/splits)
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -134,22 +132,20 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (NO WHITESPACE TRUST)
+# OPENAI CORRECTION (RELAXED – DO NOT POLICE WHITESPACE)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
     try:
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
-            "IKKE slå sammen eller del ord.\n"
-            "IKKE fjern eller legg til mellomrom.\n"
-            "IKKE endre rekkefølge på ord.\n\n"
-            "Du har lov til å rette:\n"
+            "Du kan rette:\n"
             "- stavefeil\n"
             "- grammatikk\n"
             "- bøyning\n"
             "- tegnsetting\n"
             "- store og små bokstaver\n\n"
+            "Behold mening og stil.\n"
             "Returner KUN teksten."
         )
 
