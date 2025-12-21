@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (SIMPLE, HARD LENGTH GUARD)
+# CHARWISE DIFF (COMPOUND-ABSORPTION SAFE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -80,7 +80,9 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # Ignore joins / splits entirely
+        # -------------------------------------------------
+        # IGNORE JOINS / SPLITS
+        # -------------------------------------------------
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -88,19 +90,18 @@ def find_differences_charwise(original: str, corrected: str):
             o_tok = o_tokens[i1]
             c_tok = c_tokens[j1]
 
+            # 🔥 HARD STOP: compound absorption (THIS IS THE FIX)
+            next_orig = o_tokens[i1 + 1] if i1 + 1 < len(o_tokens) else None
+            if next_orig and c_tok == o_tok + next_orig:
+                continue
+
             if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
-                orig_span = orig[s:e]
-
-                # 🔒 ONLY RULE THAT MATTERS
-                if len(c_tok) > len(orig_span):
-                    continue
-
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig_span,
+                    "original": orig[s:e],
                     "suggestion": c_tok,
                 })
             continue
@@ -193,59 +194,3 @@ def index(request):
         })
 
     return render(request, "checker/index.html")
-
-
-# -------------------------------------------------
-# AUTH (UNCHANGED)
-# -------------------------------------------------
-
-from django.contrib.auth.models import User
-from django.contrib.auth import login, authenticate, logout
-from django.contrib import messages
-
-
-def register(request):
-    if request.method != "POST":
-        return redirect("index")
-
-    email = request.POST.get("email")
-    password = request.POST.get("password")
-    name = request.POST.get("name")
-
-    if User.objects.filter(username=email).exists():
-        messages.error(request, "E-post finnes allerede.")
-        return redirect("/")
-
-    user = User.objects.create_user(
-        username=email,
-        email=email,
-        password=password,
-        first_name=name,
-    )
-
-    login(request, user)
-    return redirect("/")
-
-
-def login_view(request):
-    if request.method != "POST":
-        return redirect("/")
-
-    user = authenticate(
-        request,
-        username=request.POST.get("email"),
-        password=request.POST.get("password"),
-    )
-
-    if user is None:
-        messages.error(request, "Feil e-post eller passord.")
-        return redirect("/")
-
-    login(request, user)
-    return redirect("/")
-
-
-def logout_view(request):
-    if request.method == "POST":
-        logout(request)
-    return redirect("/")
