@@ -10,14 +10,15 @@ client = OpenAI()
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------
-# STRICT CHARWISE DIFF (DANISH-PROVEN LOGIC)
-# - Only highlight SAFE 1-to-1 token replacements
-# - Ignore any join/split (space add/remove) by ignoring non 1-to-1 replaces
-# - No whitespace hacks / no post-repair
+# TOKENIZATION (DANISH-PROVEN)
 # -------------------------------------------------
 
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
+
+# -------------------------------------------------
+# CHARWISE DIFF (UNCHANGED, SAFE)
+# -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
     diffs = []
@@ -28,7 +29,6 @@ def find_differences_charwise(original: str, corrected: str):
     def merge_punct(tokens):
         out = []
         for t in tokens:
-            # attach punctuation to previous token (same as Danish logic)
             if out and re.fullmatch(r"[.,;:!?]", t):
                 out[-1] += t
             else:
@@ -53,11 +53,11 @@ def find_differences_charwise(original: str, corrected: str):
     c_pos = map_positions(corr, c_tokens)
 
     if o_pos is None or c_pos is None:
-        return []  # fail-safe: never guess
+        return []
 
-    def span(pos, a, b, text_len):
+    def span(pos, a, b):
         if a >= len(pos):
-            return text_len, text_len
+            return len(orig), len(orig)
         if a == b:
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
@@ -68,8 +68,6 @@ def find_differences_charwise(original: str, corrected: str):
 
         if not a0 or not b0:
             return False
-
-        # HARD RULES (kill drift)
         if a0[0] != b0[0]:
             return False
 
@@ -81,21 +79,16 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # -------------------------------------------------
-        # IGNORE JOIN / SPLIT (space changes) AND any multi-token replace
-        # -------------------------------------------------
+        # Ignore join/split completely
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
-        # -------------------------------------------------
-        # SINGLE WORD REPLACE (safe only)
-        # -------------------------------------------------
         if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
 
             if safe_word_replace(o, c):
-                s, e = span(o_pos, i1, i2, len(orig))
+                s, e = span(o_pos, i1, i2)
                 diffs.append({
                     "type": "replace",
                     "start": s,
@@ -105,12 +98,9 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
-        # -------------------------------------------------
-        # INSERT punctuation only (rare due to merge_punct, but keep)
-        # -------------------------------------------------
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
-                s, _ = span(o_pos, i1, i1, len(orig))
+                s, _ = span(o_pos, i1, i1)
                 diffs.append({
                     "type": "insert",
                     "start": s,
@@ -118,15 +108,10 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": "",
                     "suggestion": c_tokens[j1],
                 })
-            continue
 
-        # -------------------------------------------------
-        # DELETE punctuation only (and tiny tokens) (Danish-safe behavior)
-        # -------------------------------------------------
         if tag == "delete" and (i2 - i1) == 1:
-            tok = o_tokens[i1]
-            if re.fullmatch(r"[.,;:!?]+", tok) or len(tok) <= 2:
-                s, e = span(o_pos, i1, i2, len(orig))
+            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
+                s, e = span(o_pos, i1, i2)
                 diffs.append({
                     "type": "delete",
                     "start": s,
@@ -134,40 +119,47 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": orig[s:e],
                     "suggestion": "",
                 })
-            continue
-
-        # EVERYTHING ELSE → IGNORE (prevents red explosions)
 
     return diffs
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (DANISH-STYLE: no whitespace hacks)
+# OPENAI CORRECTION (DANISH TWO-PASS SYSTEM)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
-    """
-    Full Norwegian correction (Bokmål) like Danish:
-    - spelling, grammar, inflection, punctuation, capitalization, commas
-    - keep meaning/tone; avoid stylistic rewriting
-    - DOES NOT do any post whitespace enforcement (same as Danish)
-    """
     try:
         base_prompt = (
-            "Du er en profesjonell norsk språkvasker (bokmål).\n\n"
-            "Oppgave:\n"
-            "- Returner teksten i perfekt norsk bokmål.\n"
-            "- Rett stavefeil, grammatikk, bøyning, tegnsetting, store/små bokstaver og kommatering "
-            "(inkludert komma før leddsetninger / startkomma der det passer).\n\n"
-            "Regler:\n"
-            "- Behold betydning og tone.\n"
-            "- Ikke legg til nye setninger.\n"
-            "- Ikke fjern innhold.\n"
-            "- Unngå stilistisk omskriving.\n\n"
-            "Returner KUN den korrigerte teksten, uten forklaring."
+            "Du er en profesjonell norsk språkvasker.\n"
+            "Returner teksten i korrekt norsk bokmål.\n\n"
+            "Du kan rette:\n"
+            "- stavefeil\n"
+            "- grammatikk\n"
+            "- bøyning\n"
+            "- tegnsetting\n"
+            "- store og små bokstaver\n\n"
+            "Behold betydning og stil.\n"
+            "Returner KUN teksten."
         )
 
-        resp = client.chat.completions.create(
+        strict_prompt = (
+            "Du er en ekstremt streng norsk språkkorrektør.\n\n"
+            "ABSOLUTTE REGLER:\n"
+            "- IKKE legg til mellomrom\n"
+            "- IKKE fjern mellomrom\n"
+            "- IKKE slå sammen ord\n"
+            "- IKKE del ord\n"
+            "- IKKE endre rekkefølge på ord\n\n"
+            "Du har KUN lov til å rette:\n"
+            "- stavefeil inne i samme ord\n"
+            "- små bøyningsfeil\n"
+            "- tegnsetting\n"
+            "- store/små bokstaver\n\n"
+            "Returner KUN teksten."
+        )
+
+        # ---- PASS 1: full correction
+        r1 = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": base_prompt},
@@ -176,27 +168,25 @@ def correct_with_openai_no(text: str) -> str:
             temperature=0,
         )
 
-        corrected = (resp.choices[0].message.content or "").strip()
+        corrected = (r1.choices[0].message.content or "").strip()
+        if not corrected:
+            return text
 
-        # Danish-style retry if no visible change
-        if corrected and corrected.strip() == text.strip():
-            resp2 = client.chat.completions.create(
+        # ---- WHITESPACE CHECK (DANISH CORE RULE)
+        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
+            # ---- PASS 2: SAFE MODE
+            r2 = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": base_prompt
-                        + "\n\nVær ekstra nøye: finn også små komma- og tegnsettingsfeil.",
-                    },
+                    {"role": "system", "content": strict_prompt},
                     {"role": "user", "content": text},
                 ],
                 temperature=0,
             )
-            corrected2 = (resp2.choices[0].message.content or "").strip()
-            if corrected2:
-                corrected = corrected2
+            safe = (r2.choices[0].message.content or "").strip()
+            return safe or text
 
-        return corrected or text
+        return corrected
 
     except Exception:
         logger.exception("OpenAI error")
