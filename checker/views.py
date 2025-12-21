@@ -8,33 +8,51 @@ import difflib
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
+# -----------------------------
+# Tokenization (alignment-safe)
+# -----------------------------
+
+TOKEN_RE = re.compile(r"\S+")
+
+def tokenize_with_offsets(text: str):
+    """
+    Returns list of (token, start, end)
+    preserving exact character offsets.
+    """
+    return [
+        (m.group(), m.start(), m.end())
+        for m in TOKEN_RE.finditer(text)
+    ]
 
 
+# -----------------------------
+# OpenAI correction (SAFE MODE)
+# -----------------------------
 
 def correct_with_openai_no(text: str) -> str:
     """
-    Correct Norwegian text WITHOUT changing:
-    - word count
-    - word order
-    - whitespace
+    Norwegian spellcheck ONLY.
+    No word order changes, no spacing changes,
+    no punctuation movement.
     """
     try:
-        # ✅ Canonical whitespace
-        text = re.sub(r"\s+", " ", text).strip()
-
         system_prompt = (
-            "Du er en profesjonell norsk språkkorrektør.\n\n"
-            "VIKTIGE REGLER (MÅ FØLGES):\n"
-            "- IKKE legg til nye ord\n"
+            "Du er en ekstremt streng norsk språkkorrektør.\n\n"
+
+            "ABSOLUTTE REGLER (MÅ FØLGES):\n"
+            "- IKKE legg til ord\n"
             "- IKKE fjern ord\n"
             "- IKKE endre rekkefølgen på ord\n"
             "- IKKE del eller slå sammen ord\n"
+            "- IKKE flytt, legg til eller fjern tegnsetting\n"
             "- IKKE endre mellomrom eller linjeskift\n\n"
-            "Du har KUN lov til å:\n"
-            "- rette stavefeil INNE I eksisterende ord\n"
-            "- legge til eller fjerne tegnsetting SOM ER EN DEL AV ORDET\n\n"
-            "Hvis en feil krever omskriving, LA DEN STÅ URØRT.\n\n"
-            "Returner KUN teksten."
+
+            "DU HAR KUN LOV TIL Å:\n"
+            "- rette rene stavefeil inne i samme ord\n"
+            "- rette små bøyningsfeil av samme ord\n\n"
+
+            "HVIS DU ER I TVIL → IKKE ENDRE.\n\n"
+            "Returner KUN teksten, uten forklaring."
         )
 
         resp = client.chat.completions.create(
@@ -46,11 +64,11 @@ def correct_with_openai_no(text: str) -> str:
             temperature=0,
         )
 
-        corrected = (resp.choices[0].message.content or "").strip()
+        corrected = (resp.choices[0].message.content or "")
 
-        # HARD SAFETY: word count must match
-        if len(corrected.split()) != len(text.split()):
-            logger.warning("Word count mismatch – disabling correction")
+        # HARD SAFETY: token count must match
+        if len(tokenize_with_offsets(text)) != len(tokenize_with_offsets(corrected)):
+            logger.warning("Token count mismatch – disabling correction")
             return text
 
         return corrected if corrected else text
@@ -59,58 +77,52 @@ def correct_with_openai_no(text: str) -> str:
         logger.exception("OpenAI error")
         return text
 
-def find_differences_charwise(original: str, corrected: str):
-    """
-    Bullet-proof diff:
-    - Compares word-by-word ONLY
-    - Aborts immediately if alignment breaks
-    """
 
+# -----------------------------
+# Token-wise diff (bulletproof)
+# -----------------------------
+
+def find_differences_tokenwise(original: str, corrected: str):
     diffs = []
 
-    orig_words = original.split(" ")
-    corr_words = corrected.split(" ")
+    orig_tokens = tokenize_with_offsets(original)
+    corr_tokens = tokenize_with_offsets(corrected)
 
-    # ❌ Abort if alignment is impossible
-    if len(orig_words) != len(corr_words):
+    # Abort immediately if alignment breaks
+    if len(orig_tokens) != len(corr_tokens):
         return []
 
-    cursor = 0
-
-    for orig, corr in zip(orig_words, corr_words):
-        start = cursor
-        end = start + len(orig)
-
-        if orig == corr:
-            cursor = end + 1
+    for (o_tok, o_start, o_end), (c_tok, _, _) in zip(orig_tokens, corr_tokens):
+        if o_tok == c_tok:
             continue
 
-        # Strip punctuation for comparison
-        o_core = orig.lower().strip(".,;:!?")
-        c_core = corr.lower().strip(".,;:!?")
+        o_core = o_tok.lower().strip(".,;:!?")
+        c_core = c_tok.lower().strip(".,;:!?")
 
-        # Allow only small spelling fixes
-        if difflib.SequenceMatcher(a=o_core, b=c_core).ratio() < 0.8:
-            # ❌ Abort everything — alignment is unsafe
-            return []
+        # Allow only small spelling corrections
+        if difflib.SequenceMatcher(a=o_core, b=c_core).ratio() < 0.85:
+            return []  # abort entire diff safely
 
         diffs.append({
             "type": "replace",
-            "start": start,
-            "end": end,
-            "original": orig,
-            "suggestion": corr,
+            "start": o_start,
+            "end": o_end,
+            "original": o_tok,
+            "suggestion": c_tok,
         })
-
-        cursor = end + 1
 
     return diffs
 
+
+# -----------------------------
+# Main view
+# -----------------------------
+
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        raw_text = (request.POST.get("text") or "").strip()
+        original_text = request.POST.get("text", "")
 
-        if not raw_text:
+        if not original_text.strip():
             return JsonResponse({
                 "original_text": "",
                 "corrected_text": "",
@@ -118,14 +130,11 @@ def index(request):
                 "error_count": 0,
             })
 
-        # ✅ Canonical text
-        collapsed_text = re.sub(r"\s+", " ", raw_text).strip()
-
-        corrected = correct_with_openai_no(collapsed_text)
-        differences = find_differences_charwise(collapsed_text, corrected)
+        corrected = correct_with_openai_no(original_text)
+        differences = find_differences_tokenwise(original_text, corrected)
 
         return JsonResponse({
-            "original_text": collapsed_text,
+            "original_text": original_text,
             "corrected_text": corrected,
             "differences": differences,
             "error_count": len(differences),
@@ -134,6 +143,9 @@ def index(request):
     return render(request, "checker/index.html")
 
 
+# -----------------------------
+# Auth (unchanged)
+# -----------------------------
 
 from django.contrib.auth.models import User
 from django.contrib.auth import login
@@ -162,8 +174,7 @@ def register(request):
     return redirect(request.POST.get("next", "/"))
 
 
-from django.contrib.auth import authenticate, login
-from django.contrib import messages
+from django.contrib.auth import authenticate
 
 def login_view(request):
     if request.method != "POST":
@@ -176,11 +187,7 @@ def login_view(request):
         messages.error(request, "Fyll i både e-post och lösenord.")
         return redirect(request.POST.get("next", "/"))
 
-    user = authenticate(
-        request,
-        username=email,
-        password=password
-    )
+    user = authenticate(request, username=email, password=password)
 
     if user is None:
         messages.error(request, "Fel e-post eller lösenord.")
