@@ -1,269 +1,247 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from openai import OpenAI
-import logging
+from django.http import JsonResponse, HttpResponse
+from punctfix import PunctFixer
+from docx import Document
+from io import BytesIO
+import openai
+import os
 import re
 import difflib
 import unicodedata
+from pathlib import Path
+from dotenv import load_dotenv
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.conf import settings
+import stripe
 
+# ---------------------------
+# Load the correct .env file
+# ---------------------------
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_PATH = BASE_DIR / "punctuation_fixer" / ".env"
+load_dotenv(ENV_PATH)
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+if not openai.api_key:
+    print("⚠ OPENAI_API_KEY is missing. Expected at:", ENV_PATH)
+
+# Keep for later comma work if needed
+fixer = PunctFixer(language="no")
+
+from openai import OpenAI
 client = OpenAI()
-logger = logging.getLogger(__name__)
 
-# -------------------------------------------------
-# TOKENIZATION (DANISH-PROVEN)
-# -------------------------------------------------
 
-TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
+# ===============================
+# MAIN VIEW
+# ===============================
 
-# -------------------------------------------------
-# HELPERS (TOP-LEVEL — IMPORTANT)
-# -------------------------------------------------
+def index(request):
+    is_paying = False
 
-def norm_word(tok: str) -> str:
-    return tok.lower().strip(".,;:!?")
+    if request.user.is_authenticated:
+        profile = getattr(request.user, "profile", None)
+        is_paying = profile and profile.subscription_status == "active"
 
-def levenshtein(a: str, b: str) -> int:
-    if a == b:
-        return 0
-    if not a:
-        return len(b)
-    if not b:
-        return len(a)
-    if len(a) > len(b):
-        a, b = b, a
+    if request.method == "POST":
+        if not is_paying:
+            return JsonResponse({"requires_payment": True})
 
-    prev = list(range(len(b) + 1))
-    for i, ca in enumerate(a, start=1):
-        cur = [i]
-        for j, cb in enumerate(b, start=1):
-            cur.append(min(
-                cur[j - 1] + 1,
-                prev[j] + 1,
-                prev[j - 1] + (ca != cb),
-            ))
-        prev = cur
-    return prev[-1]
+        text = request.POST.get("text", "")
 
-def safe_word_replace(o, c):
-    """
-    General spelling / inflection safety:
-    - Allows: tekst→tekster, de→dem, jobb→job
-    - Blocks large rewrites
-    - Language-agnostic
-    """
-    o0 = norm_word(o)
-    c0 = norm_word(c)
+        if text:
+            corrected_text = correct_with_openai(text)
 
-    if not o0 or not c0 or o0 == c0:
-        return False
+            print("🧠 DEBUG: Original ->", repr(text))
+            print("🧠 DEBUG: Corrected ->", repr(corrected_text))
+            print("🧠 DEBUG: Same?", text == corrected_text)
 
-    L = max(len(o0), len(c0))
+            differences = find_differences_charwise(text, corrected_text)
 
-    # Block extreme jumps
-    if abs(len(o0) - len(c0)) > 3 and L <= 8:
-        return False
-    if abs(len(o0) - len(c0)) > 4:
-        return False
+            print("🧩 DEBUG: Differences:", differences)
+            print("🧩 DEBUG: Count:", len(differences))
+            print("--------------------------------")
 
-    # Anchor for non-trivial words
-    if L >= 4:
-        if not (o0[:2] == c0[:2] or o0[-2:] == c0[-2:]):
-            return False
-
-    dist = levenshtein(o0, c0)
-
-    if L <= 3:
-        return dist <= 1
-    if L <= 6:
-        return dist <= 2
-    if L <= 10:
-        return dist <= 3
-
-    ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
-    return ratio >= 0.82
-
-def is_compound_join(o_tokens, i1, c_tok):
-    """
-    Blocks: privat + livet → privatlivet
-    """
-    c0 = norm_word(c_tok)
-    if not c0:
-        return False
-
-    cur = norm_word(o_tokens[i1]) if i1 < len(o_tokens) else ""
-    nxt = norm_word(o_tokens[i1 + 1]) if i1 + 1 < len(o_tokens) else ""
-    prv = norm_word(o_tokens[i1 - 1]) if i1 - 1 >= 0 else ""
-
-    return (
-        (nxt and c0 == cur + nxt) or
-        (prv and c0 == prv + cur)
-    )
-
-# -------------------------------------------------
-# DIFF ENGINE
-# -------------------------------------------------
-
-def find_differences_charwise(original: str, corrected: str):
-    diffs = []
-
-    orig = unicodedata.normalize("NFC", original)
-    corr = unicodedata.normalize("NFC", corrected)
-
-    def merge_punct(tokens):
-        out = []
-        for t in tokens:
-            if out and re.fullmatch(r"[.,;:!?]", t):
-                out[-1] += t
-            else:
-                out.append(t)
-        return out
-
-    o_tokens = merge_punct(TOKEN_RE.findall(orig))
-    c_tokens = merge_punct(TOKEN_RE.findall(corr))
-
-    def map_positions(text, tokens):
-        pos = []
-        i = 0
-        for t in tokens:
-            p = text.find(t, i)
-            if p == -1:
-                return None
-            pos.append((p, p + len(t)))
-            i = p + len(t)
-        return pos
-
-    o_pos = map_positions(orig, o_tokens)
-    c_pos = map_positions(corr, c_tokens)
-
-    if o_pos is None or c_pos is None:
-        return []
-
-    def span(pos, a, b):
-        if a >= len(pos):
-            return len(orig), len(orig)
-        if a == b:
-            return pos[a][0], pos[a][0]
-        return pos[a][0], pos[b - 1][1]
-
-    sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
-
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
-            continue
-
-        # Ignore joins/splits
-        if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
-            continue
-
-        if tag == "replace":
-            o_tok = o_tokens[i1]
-            c_tok = c_tokens[j1]
-
-            if is_compound_join(o_tokens, i1, c_tok):
-                continue
-
-            if safe_word_replace(o_tok, c_tok):
-                s, e = span(o_pos, i1, i2)
-                diffs.append({
-                    "type": "replace",
-                    "start": s,
-                    "end": e,
-                    "original": orig[s:e],
-                    "suggestion": c_tok,
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({
+                    "original_text": text,
+                    "corrected_text": corrected_text,
+                    "differences": differences,
+                    "error_count": len(differences),
                 })
 
-        elif tag == "insert" and (j2 - j1) == 1:
-            if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
-                s, _ = span(o_pos, i1, i1)
-                diffs.append({
-                    "type": "insert",
-                    "start": s,
-                    "end": s,
-                    "original": "",
-                    "suggestion": c_tokens[j1],
-                })
+            return render(request, "fixer/index.html", {
+                "text": text,
+                "corrected_text": corrected_text,
+                "differences": differences,
+                "error_count": len(differences),
+                "is_paying": is_paying,
+            })
 
-        elif tag == "delete" and (i2 - i1) == 1:
-            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
-                s, e = span(o_pos, i1, i2)
-                diffs.append({
-                    "type": "delete",
-                    "start": s,
-                    "end": e,
-                    "original": orig[s:e],
-                    "suggestion": "",
-                })
+    return render(request, "fixer/index.html", {"is_paying": is_paying})
 
-    return diffs
 
-# -------------------------------------------------
-# APPLY SAFE DIFFS
-# -------------------------------------------------
+# ===============================
+# OPENAI – NORWEGIAN (MIRRORS DANISH)
+# ===============================
 
-def apply_diffs_to_text(original: str, diffs):
-    text = original
-    for d in sorted(diffs, key=lambda x: (x["start"], x["end"]), reverse=True):
-        text = text[:d["start"]] + d["suggestion"] + text[d["end"]:]
-    return text
-
-# -------------------------------------------------
-# OPENAI
-# -------------------------------------------------
-
-def correct_with_openai_no(text: str) -> str:
+def correct_with_openai(text: str) -> str:
+    """
+    Produces a fully corrected Norwegian version of the input text:
+    - Fixes spelling, grammar, punctuation, capitalization, and commas
+    - Keeps tone and meaning identical
+    - Avoids stylistic rewriting
+    """
     try:
-        text = re.sub(r"\s+", " ", text).strip()
-
-        prompt = (
-            "Du er en profesjonell norsk språkvasker.\n\n"
-            "REGLER:\n"
-            "- IKKE legg til eller fjern ord\n"
-            "- IKKE endre rekkefølge\n"
-            "- IKKE slå sammen eller dele ord\n\n"
-            "Du kan rette:\n"
-            "- stavefeil\n"
-            "- bøyning\n"
-            "- tegnsetting\n"
-            "- store/små bokstaver\n\n"
-            "Returner KUN teksten."
+        base_prompt = (
+            "Du er en profesjonell norsk språkvasker. "
+            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt "
+            "og naturlig form på norsk. "
+            "Du skal rette ALLE feil i rettskrivning, bøyning, ordstilling, "
+            "store bokstaver, mellomrom og tegnsetting. "
+            "Behold tekstens betydning, stil og tone uendret. "
+            "Legg aldri til ekstra ord, tegn eller utropstegn. "
+            "Returner KUN den korrigerte teksten uten forklaring."
         )
 
-        r = client.chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": prompt},
+                {"role": "system", "content": base_prompt},
                 {"role": "user", "content": text},
             ],
             temperature=0,
         )
 
-        return (r.choices[0].message.content or "").strip() or text
-    except Exception:
-        logger.exception("OpenAI error")
+        corrected = (resp.choices[0].message.content or "").strip()
+
+        if corrected.strip() == text.strip():
+            print("⚠ No change detected – retrying stricter mode...")
+            resp2 = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": base_prompt
+                        + " Hvis du er i tvil, rett heller for mye enn for lite. "
+                          "Finn ALLE feil, også små rettskrivnings- og tegnsettingsfeil."
+                    },
+                    {"role": "user", "content": text},
+                ],
+                temperature=0,
+            )
+            corrected2 = (resp2.choices[0].message.content or "").strip()
+            if corrected2:
+                corrected = corrected2
+
+        return corrected if corrected else text
+
+    except Exception as e:
+        print("❌ OpenAI error:", e)
         return text
 
-# -------------------------------------------------
-# VIEW
-# -------------------------------------------------
 
-def index(request):
-    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        original = unicodedata.normalize("NFC", request.POST.get("text", ""))
+# ===============================
+# DIFF ENGINE (IDENTICAL TO DANISH)
+# ===============================
 
-        corrected_raw = correct_with_openai_no(original)
-        diffs = find_differences_charwise(original, corrected_raw)
-        safe_corrected = apply_diffs_to_text(original, diffs)
+def find_differences_charwise(original: str, corrected: str):
+    diffs_out = []
 
-        return JsonResponse({
-            "original_text": original,
-            "corrected_text": safe_corrected,
-            "differences": diffs,
-            "error_count": len(diffs),
-        })
+    orig_text = unicodedata.normalize("NFC", original)
+    corr_text = unicodedata.normalize("NFC", corrected)
 
-    return render(request, "checker/index.html")
+    def merge_punctuation(tokens):
+        merged = []
+        for tok in tokens:
+            if merged and re.match(r"^[,.:;!?]$", tok):
+                merged[-1] += tok
+            else:
+                merged.append(tok)
+        return merged
 
-# -------------------------------------------------
+    orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
+    corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
+
+    orig_positions = []
+    cursor = 0
+    for tok in orig_tokens:
+        start = orig_text.find(tok, cursor)
+        end = start + len(tok)
+        orig_positions.append((start, end))
+        cursor = end
+
+    def span_for_range(i_start, i_end):
+        if i_start >= len(orig_positions):
+            return len(orig_text), len(orig_text)
+        if i_start == i_end:
+            s, _ = orig_positions[i_start]
+            return s, s
+        return orig_positions[i_start][0], orig_positions[i_end - 1][1]
+
+    def tokens_are_small_edit(a, b):
+        a_low = a.lower()
+        b_low = b.lower()
+        if a_low.strip(",.;:!?") == b_low.strip(",.;:!?"):
+            return True
+        ratio = difflib.SequenceMatcher(a=a_low, b=b_low).ratio()
+        return ratio >= 0.6
+
+    def is_pure_punctuation(tok):
+        return bool(re.fullmatch(r"[,.:;!?]+", tok))
+
+    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            continue
+
+        if tag == "replace":
+            if (i2 - i1) == 1 and (j2 - j1) == 1:
+                o = orig_tokens[i1]
+                c = corr_tokens[j1]
+                if tokens_are_small_edit(o, c):
+                    s, e = span_for_range(i1, i2)
+                    diffs_out.append({
+                        "type": "replace",
+                        "start": s,
+                        "end": e,
+                        "original": o,
+                        "suggestion": c,
+                    })
+
+        elif tag == "delete":
+            if (i2 - i1) == 1:
+                o = orig_tokens[i1]
+                if is_pure_punctuation(o) or len(o) <= 2:
+                    s, e = span_for_range(i1, i2)
+                    diffs_out.append({
+                        "type": "delete",
+                        "start": s,
+                        "end": e,
+                        "original": o,
+                        "suggestion": "",
+                    })
+
+        elif tag == "insert":
+            if (j2 - j1) == 1:
+                c = corr_tokens[j1]
+                if is_pure_punctuation(c):
+                    s, _ = span_for_range(i1, i1)
+                    diffs_out.append({
+                        "type": "insert",
+                        "start": s,
+                        "end": s,
+                        "original": "",
+                        "suggestion": c,
+                    })
+
+    return diffs_out
+
 # AUTH
 # -------------------------------------------------
 
