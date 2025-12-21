@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.http import JsonResponse
 from openai import OpenAI
 import logging
@@ -9,16 +9,8 @@ import unicodedata
 client = OpenAI()
 logger = logging.getLogger(__name__)
 
-# -------------------------------------------------
-# TOKENIZATION (DANISH-PROVEN)
-# -------------------------------------------------
-
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
-
-# -------------------------------------------------
-# CHARWISE DIFF (COMPOUND-ABSORPTION SAFE)
-# -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
     diffs = []
@@ -29,7 +21,7 @@ def find_differences_charwise(original: str, corrected: str):
     def merge_punct(tokens):
         out = []
         for t in tokens:
-            if out and re.fullmatch(r"[.,;:!?]", t):
+            if out and re.match(r"^[.,;:!?]+$", t):
                 out[-1] += t
             else:
                 out.append(t)
@@ -80,9 +72,6 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # -------------------------------------------------
-        # IGNORE JOINS / SPLITS
-        # -------------------------------------------------
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
@@ -90,7 +79,9 @@ def find_differences_charwise(original: str, corrected: str):
             o_tok = o_tokens[i1]
             c_tok = c_tokens[j1]
 
-            # 🔥 HARD STOP: compound absorption (THIS IS THE FIX)
+            if not c_tok:
+                continue
+
             next_orig = o_tokens[i1 + 1] if i1 + 1 < len(o_tokens) else None
             if next_orig and c_tok == o_tok + next_orig:
                 continue
@@ -107,19 +98,21 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         if tag == "insert" and (j2 - j1) == 1:
-            if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
+            tok = c_tokens[j1]
+            if tok and re.match(r"^[.,;:!?]+$", tok):
                 s, _ = span(o_pos, i1, i1)
                 diffs.append({
                     "type": "insert",
                     "start": s,
                     "end": s,
                     "original": "",
-                    "suggestion": c_tokens[j1],
+                    "suggestion": tok,
                 })
             continue
 
         if tag == "delete" and (i2 - i1) == 1:
-            if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
+            tok = o_tokens[i1]
+            if tok and re.match(r"^[.,;:!?]+$", tok):
                 s, e = span(o_pos, i1, i2)
                 diffs.append({
                     "type": "delete",
@@ -133,28 +126,24 @@ def find_differences_charwise(original: str, corrected: str):
     return diffs
 
 
-# -------------------------------------------------
-# OPENAI CORRECTION (UNCHANGED)
-# -------------------------------------------------
-
 def correct_with_openai_no(text: str) -> str:
     try:
-        prompt = (
-            "Du er en profesjonell norsk språkvasker.\n\n"
-            "Du kan rette:\n"
-            "- stavefeil\n"
-            "- grammatikk\n"
-            "- bøyning\n"
-            "- tegnsetting\n"
-            "- store og små bokstaver\n\n"
-            "Behold mening og stil.\n"
-            "Returner KUN teksten."
-        )
-
         r = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": prompt},
+                {
+                    "role": "system",
+                    "content": (
+                        "Du er en profesjonell norsk språkvasker.\n\n"
+                        "Du kan rette:\n"
+                        "- stavefeil\n"
+                        "- grammatikk\n"
+                        "- bøyning\n"
+                        "- tegnsetting\n"
+                        "- store og små bokstaver\n\n"
+                        "Returner KUN teksten."
+                    ),
+                },
                 {"role": "user", "content": text},
             ],
             temperature=0,
@@ -166,10 +155,6 @@ def correct_with_openai_no(text: str) -> str:
         logger.exception("OpenAI error")
         return text
 
-
-# -------------------------------------------------
-# MAIN VIEW
-# -------------------------------------------------
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
