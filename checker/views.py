@@ -89,45 +89,46 @@ def find_differences_charwise(original: str, corrected: str):
             prev = cur
         return prev[-1]
 
-    def safe_word_replace(o, c):
-        """
-        Allow real spelling/inflection fixes while preventing wild swaps.
-        Key: short words need looser thresholds (dt->det, de->dem, job->jobb).
-        """
-        o0 = norm_word(o)
-        c0 = norm_word(c)
+def safe_word_replace(o, c):
+    """
+    General "safe" single-token replacement:
+    - Allows typical spelling + small inflection changes (tekst->tekster, de->dem)
+    - Blocks big rewrites
+    - Does NOT need explicit word lists
+    Compound-joins are blocked elsewhere by is_compound_join().
+    """
+    o0 = norm_word(o)
+    c0 = norm_word(c)
 
-        if not o0 or not c0:
+    if not o0 or not c0 or o0 == c0:
+        return False
+
+    # Hard block extreme length jumps (prevents many wild swaps)
+    L = max(len(o0), len(c0))
+    if abs(len(o0) - len(c0)) > 3 and L <= 8:
+        return False
+    if abs(len(o0) - len(c0)) > 4:
+        return False
+
+    # Require SOME shared anchor for non-trivial words (avoids "random" swaps)
+    # For very short tokens, the edit-distance constraint below is enough.
+    if L >= 4:
+        if not (o0[:2] == c0[:2] or o0[-2:] == c0[-2:]):
             return False
-        if o0 == c0:
-            return False
 
-        # Do not allow completely different starting letters (prevents many bad swaps).
-        # (This also blocks og -> å, which is grammatical rather than "spelling".)
-        if o0[0] != c0[0]:
-            return False
+    dist = levenshtein(o0, c0)
 
-        L = max(len(o0), len(c0))
+    # Accept by edit distance (tight for short words, slightly looser for longer)
+    if L <= 3:
+        return dist <= 1          # de->dem (dist 1), dt->det (dist 1)
+    if L <= 6:
+        return dist <= 2          # tekst->tekster (dist 2)
+    if L <= 10:
+        return dist <= 3
 
-        # Extra-safe allowlist patterns for common spelling expansions
-        # job -> jobb, etc.
-        if len(c0) == len(o0) + 1 and c0[:-1] == o0 and c0[-1] == o0[-1]:
-            return True
-
-        # Prefix expansion/contraction (det <-> dt won't match, but other common ones will)
-        if (c0.startswith(o0) or o0.startswith(c0)) and abs(len(o0) - len(c0)) <= 2 and L <= 6:
-            return True
-
-        # Levenshtein-based acceptance (very good for short tokens)
-        dist = levenshtein(o0, c0)
-        if L <= 3:
-            return dist <= 1  # dt->det (dist 1), de->dem (dist 1)
-        if L <= 5:
-            return dist <= 1
-
-        # For longer words, require strong similarity
-        ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
-        return ratio >= 0.88
+    # For longer words, also require decent similarity
+    ratio = difflib.SequenceMatcher(a=o0, b=c0).ratio()
+    return dist <= 3 and ratio >= 0.82
 
     def is_compound_join(o_tokens, i1, c_tok):
         """
