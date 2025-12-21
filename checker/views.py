@@ -179,3 +179,58 @@ def index(request):
         })
 
     return render(request, "checker/index.html")
+
+
+
+
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.shortcuts import redirect
+
+
+def register(request):
+    if request.method != "POST":
+        return redirect("index")
+
+    email = request.POST.get("email")
+    password = request.POST.get("password")
+    name = request.POST.get("name")
+
+    if User.objects.filter(username=email).exists():
+        messages.error(request, "E-post finnes allerede.")
+        return redirect("/")
+
+    user = User.objects.create_user(
+        username=email,
+        email=email,
+        password=password,
+        first_name=name,
+    )
+
+    login(request, user)
+    return redirect("/")
+
+
+def login_view(request):
+    if request.method != "POST":
+        return redirect("/")
+
+    user = authenticate(
+        request,
+        username=request.POST.get("email"),
+        password=request.POST.get("password"),
+    )
+
+    if user is None:
+        messages.error(request, "Feil e-post eller passord.")
+        return redirect("/")
+
+    login(request, user)
+    return redirect("/")
+
+
+def logout_view(request):
+    if request.method == "POST":
+        logout(request)
+    return redirect("/")
