@@ -18,7 +18,6 @@ import difflib
 import unicodedata
 
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
-
 def find_differences_charwise(original: str, corrected: str):
     diffs_out = []
 
@@ -69,15 +68,30 @@ def find_differences_charwise(original: str, corrected: str):
         return text[s:e], s, e
 
     def core(s: str) -> str:
+        # remove spaces/punct so "privat livet." == "privatlivet."
         return re.sub(r"[\W_]+", "", s.lower())
-
-    def tokens_are_small_edit(a, b):
-        if a.lower().strip(",.;:!?") == b.lower().strip(",.;:!?"):
-            return True
-        return difflib.SequenceMatcher(a=a.lower(), b=b.lower()).ratio() >= 0.7
 
     def is_pure_punctuation(tok):
         return bool(re.fullmatch(r"[,.:;!?]+", tok))
+
+    def is_safe_small_edit(a: str, b: str) -> bool:
+        """
+        VERY strict: only allow when it's clearly the same word with a small change.
+        This prevents insane replacements like 'livet' -> 'ofte'.
+        """
+        a0 = a.lower().strip(",.;:!?")
+        b0 = b.lower().strip(",.;:!?")
+
+        # exact match ignoring trivial punctuation
+        if a0 == b0:
+            return True
+
+        # require same first letter (kills most drift-pairing)
+        if not a0 or not b0 or a0[0] != b0[0]:
+            return False
+
+        # require very high similarity
+        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.90
 
     sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
 
@@ -86,7 +100,8 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         # -----------------------------
-        # JOIN / SPLIT (privat livet -> privatlivet)
+        # JOIN / SPLIT (allow ONLY if core matches)
+        # Example: "privat livet" -> "privatlivet"
         # -----------------------------
         if tag == "replace" and max(i2 - i1, j2 - j1) <= 3:
             orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
@@ -100,16 +115,18 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": orig_chunk,
                     "suggestion": corr_chunk,
                 })
-                continue  # ⛔ DO NOT emit smaller diffs
+            # IMPORTANT: if it’s not a join/split match, we IGNORE this replace
+            # (prevents drift generating garbage suggestions)
+            continue
 
         # -----------------------------
-        # 1 → 1 SMALL EDITS
+        # 1 -> 1 replacements: allow ONLY small safe edits
         # -----------------------------
         if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
             o = orig_tokens[i1]
             c = corr_tokens[j1]
 
-            if tokens_are_small_edit(o, c):
+            if is_safe_small_edit(o, c):
                 _, s, e = text_for_range(orig_text, orig_positions, i1, i2)
                 diffs_out.append({
                     "type": "replace",
@@ -118,10 +135,11 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": orig_text[s:e],
                     "suggestion": c,
                 })
+            # else: ignore (no highlight, no bad suggestion)
             continue
 
         # -----------------------------
-        # DELETE (small / punctuation)
+        # DELETE: only allow small/punctuation deletes
         # -----------------------------
         if tag == "delete" and (i2 - i1) == 1:
             o = orig_tokens[i1]
@@ -137,7 +155,7 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         # -----------------------------
-        # INSERT (punctuation only)
+        # INSERT: punctuation only
         # -----------------------------
         if tag == "insert" and (j2 - j1) == 1:
             c = corr_tokens[j1]
@@ -152,7 +170,11 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
+        # Anything else (reorders / rewrites) -> IGNORE to avoid garbage suggestions
+        # (This is the "never suggest completely different words" rule.)
+
     return diffs_out
+
 
 
 # -----------------------------
