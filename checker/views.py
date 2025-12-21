@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (WHITESPACE-SAFE, DANISH STYLE)
+# CHARWISE DIFF (DANISH-CORRECT, COMPOUND-SAFE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,18 +62,26 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def whitespace_changed(o, c):
-        return re.sub(r"\s+", "", o) == re.sub(r"\s+", "", c) and o != c
+    def is_compound_absorption(i1, corr_token):
+        """
+        Detects:
+        privat + livet -> privatlivet
+        """
+        if i1 + 1 >= len(o_tokens):
+            return False
+
+        next_orig = o_tokens[i1 + 1]
+
+        a = re.sub(r"\W", "", corr_token.lower())
+        b = re.sub(r"\W", "", next_orig.lower())
+
+        return a.endswith(b)
 
     def safe_word_replace(o, c):
         o0 = o.lower().strip(".,;:!?")
         c0 = c.lower().strip(".,;:!?")
 
         if not o0 or not c0:
-            return False
-
-        # 🚫 ignore whitespace-only changes (compound merges)
-        if whitespace_changed(o0, c0):
             return False
 
         if o0[0] != c0[0]:
@@ -87,13 +95,19 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # Ignore multi-token replaces (joins/splits)
+        # -------------------------------------------------
+        # 🚫 IGNORE ALL JOINS / SPLITS
+        # -------------------------------------------------
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
         if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
+
+            # 🚫 HARD BLOCK: compound absorption
+            if is_compound_absorption(i1, c):
+                continue
 
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
@@ -132,7 +146,7 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (RELAXED – DO NOT POLICE WHITESPACE)
+# OPENAI CORRECTION (RELAXED)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
