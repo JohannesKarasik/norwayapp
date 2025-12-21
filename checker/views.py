@@ -64,55 +64,46 @@ def correct_with_openai_no(text: str) -> str:
 def find_differences_charwise(original: str, corrected: str):
     diffs_out = []
 
-    orig_text = unicodedata.normalize("NFC", original)
-    corr_text = unicodedata.normalize("NFC", corrected)
+    orig = unicodedata.normalize("NFC", original)
+    corr = unicodedata.normalize("NFC", corrected)
 
-    token_pattern = r"\w+[.,;:!?]?"
+    matcher = difflib.SequenceMatcher(a=orig, b=corr)
 
-    orig_tokens = re.findall(token_pattern, orig_text, re.UNICODE)
-    corr_tokens = re.findall(token_pattern, corr_text, re.UNICODE)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != "replace":
+            continue
 
-    # Absolute safety
-    if len(orig_tokens) != len(corr_tokens):
-        return []
+        orig_chunk = orig[i1:i2]
+        corr_chunk = corr[j1:j2]
 
-    orig_positions = []
-    cursor = 0
-    for tok in orig_tokens:
-        start = orig_text.find(tok, cursor)
-        end = start + len(tok)
-        orig_positions.append((start, end))
-        cursor = end
+        # 🔒 Skip large or semantic rewrites
+        if len(orig_chunk.split()) != 1 or len(corr_chunk.split()) != 1:
+            continue
 
-    def is_small_edit(a: str, b: str) -> bool:
-        a_core = a.lower().strip(".,;:!?")
-        b_core = b.lower().strip(".,;:!?")
+        a_core = orig_chunk.lower().strip(".,;:!?")
+        b_core = corr_chunk.lower().strip(".,;:!?")
 
         if a_core == b_core:
-            return True
+            diffs_out.append({
+                "type": "replace",
+                "start": i1,
+                "end": i2,
+                "original": orig_chunk,
+                "suggestion": corr_chunk,
+            })
+            continue
 
         ratio = difflib.SequenceMatcher(a=a_core, b=b_core).ratio()
-        return ratio >= 0.8
-
-    for i, (orig_tok, corr_tok) in enumerate(zip(orig_tokens, corr_tokens)):
-        if orig_tok == corr_tok:
-            continue
-
-        if not is_small_edit(orig_tok, corr_tok):
-            continue
-
-        start, end = orig_positions[i]
-
-        diffs_out.append({
-            "type": "replace",
-            "start": start,
-            "end": end,
-            "original": orig_tok,
-            "suggestion": corr_tok,
-        })
+        if ratio >= 0.8:
+            diffs_out.append({
+                "type": "replace",
+                "start": i1,
+                "end": i2,
+                "original": orig_chunk,
+                "suggestion": corr_chunk,
+            })
 
     return diffs_out
-
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
