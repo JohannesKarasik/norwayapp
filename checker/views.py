@@ -158,7 +158,7 @@ def correct_with_openai_no(text: str) -> str:
             "Returner KUN teksten."
         )
 
-        # ---- PASS 1: full correction
+                # ---- PASS 1: full correction
         r1 = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -172,9 +172,9 @@ def correct_with_openai_no(text: str) -> str:
         if not corrected:
             return text
 
-        # ---- WHITESPACE CHECK (DANISH CORE RULE)
+        # ---- WHITESPACE CHECK
         if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            # ---- PASS 2: SAFE MODE
+            # ---- PASS 2: STRICT MODE
             r2 = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -183,14 +183,22 @@ def correct_with_openai_no(text: str) -> str:
                 ],
                 temperature=0,
             )
-            safe = (r2.choices[0].message.content or "").strip()
-            return safe or text
+
+            strict_corrected = (r2.choices[0].message.content or "").strip()
+
+            # 🔒 FINAL HARD RULE (THIS WAS MISSING)
+            if not strict_corrected:
+                return text
+
+            if re.sub(r"\S", "", strict_corrected) != re.sub(r"\S", "", text):
+                # ❌ whitespace still changed → IGNORE ALL CORRECTIONS
+                logger.warning("Whitespace change detected – skipping corrections")
+                return text
+
+            return strict_corrected
 
         return corrected
 
-    except Exception:
-        logger.exception("OpenAI error")
-        return text
 
 
 # -------------------------------------------------
