@@ -99,22 +99,18 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         # -------------------------------------------------
-        # JOIN / SPLIT (SPACE REMOVAL / INSERTION)
+# -------------------------------------------------
+# IGNORE JOIN / SPLIT (SPACE REMOVAL / INSERTION)
         # -------------------------------------------------
         if tag == "replace" and max(i2 - i1, j2 - j1) <= 3:
             o_chunk = orig[span(o_pos, i1, i2)[0]:span(o_pos, i1, i2)[1]]
             c_chunk = corr[span(c_pos, j1, j2)[0]:span(c_pos, j1, j2)[1]]
 
+            # If this is only a space removal/addition (compound word),
+            # we ignore it completely to avoid bad suggestions.
             if core(o_chunk) == core(c_chunk):
-                s, e = span(o_pos, i1, i2)
-                diffs.append({
-                    "type": "replace",
-                    "start": s,
-                    "end": e,
-                    "original": o_chunk,
-                    "suggestion": c_chunk,
-                })
-            continue  # IMPORTANT: never fall through
+                continue
+
 
         # -------------------------------------------------
         # SINGLE WORD REPLACE (VERY STRICT)
