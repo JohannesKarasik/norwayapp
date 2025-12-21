@@ -13,6 +13,12 @@ logger = logging.getLogger(__name__)
 # Charwise diff (same style as Danish)
 # -----------------------------
 
+import re
+import difflib
+import unicodedata
+
+TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
+
 def find_differences_charwise(original: str, corrected: str):
     diffs_out = []
 
@@ -28,29 +34,49 @@ def find_differences_charwise(original: str, corrected: str):
                 merged.append(tok)
         return merged
 
-    orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
-    corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
+    orig_tokens = merge_punctuation(TOKEN_RE.findall(orig_text))
+    corr_tokens = merge_punctuation(TOKEN_RE.findall(corr_text))
 
-    orig_positions = []
-    cursor = 0
-    for tok in orig_tokens:
-        start_idx = orig_text.find(tok, cursor)
-        end_idx = start_idx + len(tok)
-        orig_positions.append((start_idx, end_idx))
-        cursor = end_idx
+    def build_positions(text, tokens):
+        positions = []
+        cursor = 0
+        for tok in tokens:
+            start = text.find(tok, cursor)
+            if start == -1:
+                # If we can't map cleanly, bail out safely (no highlights)
+                return None
+            end = start + len(tok)
+            positions.append((start, end))
+            cursor = end
+        return positions
 
-    def span_for_range(i_start, i_end_exclusive):
-        if i_start >= len(orig_positions):
-            return len(orig_text), len(orig_text)
+    orig_positions = build_positions(orig_text, orig_tokens)
+    corr_positions = build_positions(corr_text, corr_tokens)
+    if orig_positions is None or corr_positions is None:
+        return []
+
+    def span_for_range(positions, i_start, i_end_exclusive, text_len):
+        if i_start >= len(positions):
+            return text_len, text_len
         if i_start == i_end_exclusive:
-            start_i, _ = orig_positions[i_start]
+            start_i, _ = positions[i_start]
             return start_i, start_i
-        return orig_positions[i_start][0], orig_positions[i_end_exclusive - 1][1]
+        return positions[i_start][0], positions[i_end_exclusive - 1][1]
+
+    def text_for_range(text, positions, i_start, i_end_exclusive):
+        s, e = span_for_range(positions, i_start, i_end_exclusive, len(text))
+        return text[s:e], s, e
+
+    def core(s: str) -> str:
+        # remove spaces + punctuation/hyphens so "privat livet." == "privatlivet."
+        s = s.lower()
+        return re.sub(r"[\s\.,;:!?\-–—\"'“”‘’()\[\]{}]", "", s)
 
     def tokens_are_small_edit(a, b):
+        # original behavior, just slightly safer against drift
         if a.lower().strip(",.;:!?") == b.lower().strip(",.;:!?"):
             return True
-        return difflib.SequenceMatcher(a=a.lower(), b=b.lower()).ratio() >= 0.6
+        return difflib.SequenceMatcher(a=a.lower(), b=b.lower()).ratio() >= 0.7
 
     def is_pure_punctuation(tok):
         return bool(re.fullmatch(r"[,.:;!?]+", tok))
@@ -60,41 +86,65 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
-            o, c = orig_tokens[i1], corr_tokens[j1]
-            if tokens_are_small_edit(o, c):
-                s, e = span_for_range(i1, i2)
-                diffs_out.append({
-                    "type": "replace",
-                    "start": s,
-                    "end": e,
-                    "original": o,
-                    "suggestion": c,
-                })
+        if tag == "replace":
+            # Case A: 1-to-1 small edit (spelling / punctuation attached to a word)
+            if (i2 - i1) == 1 and (j2 - j1) == 1:
+                o = orig_tokens[i1]
+                c = corr_tokens[j1]
+                if tokens_are_small_edit(o, c):
+                    _, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+                    diffs_out.append({
+                        "type": "replace",
+                        "start": s,
+                        "end": e,
+                        "original": orig_text[s:e],
+                        "suggestion": c,
+                    })
+                continue
 
-        elif tag == "delete" and (i2 - i1) == 1:
-            o = orig_tokens[i1]
-            if is_pure_punctuation(o) or len(o) <= 2:
-                s, e = span_for_range(i1, i2)
-                diffs_out.append({
-                    "type": "delete",
-                    "start": s,
-                    "end": e,
-                    "original": o,
-                    "suggestion": "",
-                })
+            # Case B: join/split (e.g. "privat livet" <-> "privatlivet")
+            # allow up to 3 tokens on either side to keep it tight/safe
+            if max(i2 - i1, j2 - j1) <= 3:
+                orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+                corr_chunk, _, _ = text_for_range(corr_text, corr_positions, j1, j2)
 
-        elif tag == "insert" and (j2 - j1) == 1:
-            c = corr_tokens[j1]
-            if is_pure_punctuation(c):
-                s, _ = span_for_range(i1, i1)
-                diffs_out.append({
-                    "type": "insert",
-                    "start": s,
-                    "end": s,
-                    "original": "",
-                    "suggestion": c,
-                })
+                if core(orig_chunk) == core(corr_chunk):
+                    diffs_out.append({
+                        "type": "replace",
+                        "start": s,
+                        "end": e,
+                        "original": orig_chunk,
+                        "suggestion": corr_chunk,
+                    })
+            continue
+
+        elif tag == "delete":
+            if (i2 - i1) == 1:
+                o = orig_tokens[i1]
+                if is_pure_punctuation(o) or len(o) <= 2:
+                    orig_chunk, s, e = text_for_range(orig_text, orig_positions, i1, i2)
+                    diffs_out.append({
+                        "type": "delete",
+                        "start": s,
+                        "end": e,
+                        "original": orig_chunk,
+                        "suggestion": "",
+                    })
+            continue
+
+        elif tag == "insert":
+            if (j2 - j1) == 1:
+                c = corr_tokens[j1]
+                if is_pure_punctuation(c):
+                    _, s, _ = text_for_range(orig_text, orig_positions, i1, i1)
+                    diffs_out.append({
+                        "type": "insert",
+                        "start": s,
+                        "end": s,
+                        "original": "",
+                        "suggestion": c,
+                    })
+            continue
 
     return diffs_out
 
@@ -171,6 +221,10 @@ def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         original_text = request.POST.get("text", "")
 
+        # ✅ ADDITION 1: normalize input for alignment safety
+        original_text = original_text.replace("\r\n", "\n").replace("\r", "\n")
+        original_text = unicodedata.normalize("NFC", original_text)
+
         if not original_text.strip():
             return JsonResponse({
                 "original_text": "",
@@ -180,6 +234,10 @@ def index(request):
             })
 
         corrected = correct_with_openai_no(original_text)
+
+        # ✅ ADDITION 2: normalize corrected text the same way
+        corrected = unicodedata.normalize("NFC", corrected)
+
         differences = find_differences_charwise(original_text, corrected)
 
         return JsonResponse({
