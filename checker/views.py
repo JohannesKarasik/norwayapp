@@ -1,4 +1,3 @@
-# checker/views.py
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from openai import OpenAI
@@ -11,7 +10,8 @@ client = OpenAI()
 logger = logging.getLogger(__name__)
 
 
-def correct_with_openai_sv(text: str) -> str:
+
+def correct_with_openai_no(text: str) -> str:
     """
     Returns a corrected version of the text where:
     - NO words are added or removed
@@ -19,8 +19,11 @@ def correct_with_openai_sv(text: str) -> str:
     - Only spelling and punctuation attached to a word may change
     """
     try:
+        # ✅ COLLAPSE WHITESPACE (self-defensive)
+        text = re.sub(r"\s+", " ", text).strip()
+
         system_prompt = (
-            "Du er en profesjonell norsk språkre­daktør.\n\n"
+            "Du er en profesjonell norsk språkkorrektør.\n\n"
             "VIKTIGE REGLER (MÅ FØLGES):\n"
             "- IKKE legg til nye ord\n"
             "- IKKE fjern ord\n"
@@ -28,8 +31,8 @@ def correct_with_openai_sv(text: str) -> str:
             "- IKKE del eller slå sammen ord\n"
             "- IKKE endre mellomrom eller linjeskift\n\n"
             "Du har KUN lov til å:\n"
-            "- rette stavefeil INNE I et eksisterende ord\n"
-            "- legge til eller fjerne tegnsetting SOM EN DEL AV ORDET "
+            "- rette stavefeil INNE I eksisterende ord\n"
+            "- legge til eller fjerne tegnsetting SOM ER EN DEL AV ORDET "
             "(f.eks. 'att' → 'att,')\n\n"
             "Hvis en feil krever omskriving, LA DEN STÅ URØRT.\n\n"
             "Returner KUN teksten, uten forklaring."
@@ -46,7 +49,7 @@ def correct_with_openai_sv(text: str) -> str:
 
         corrected = (resp.choices[0].message.content or "").strip()
 
-        # HARD SAFETY: word count must match exactly
+        # 🔐 HARD SAFETY: word count must match
         if len(corrected.split()) != len(text.split()):
             logger.warning("Word count mismatch – falling back to original text")
             return text
@@ -59,29 +62,20 @@ def correct_with_openai_sv(text: str) -> str:
 
 
 def find_differences_charwise(original: str, corrected: str):
-    """
-    Token-level diff where:
-    - punctuation is part of the word token
-    - ONLY 1-to-1 token replacements are allowed
-    - no inserts / deletes / reorders are surfaced
-    """
-
     diffs_out = []
 
     orig_text = unicodedata.normalize("NFC", original)
     corr_text = unicodedata.normalize("NFC", corrected)
 
-    # Token = word WITH optional attached punctuation
     token_pattern = r"\w+[.,;:!?]?"
 
     orig_tokens = re.findall(token_pattern, orig_text, re.UNICODE)
     corr_tokens = re.findall(token_pattern, corr_text, re.UNICODE)
 
-    # Absolute safety: token count must match
+    # Absolute safety
     if len(orig_tokens) != len(corr_tokens):
         return []
 
-    # Map original tokens to char positions
     orig_positions = []
     cursor = 0
     for tok in orig_tokens:
@@ -97,7 +91,6 @@ def find_differences_charwise(original: str, corrected: str):
         if a_core == b_core:
             return True
 
-        # allow small spelling fixes only
         ratio = difflib.SequenceMatcher(a=a_core, b=b_core).ratio()
         return ratio >= 0.8
 
@@ -106,7 +99,6 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         if not is_small_edit(orig_tok, corr_tok):
-            # ignore semantic rewrites
             continue
 
         start, end = orig_positions[i]
@@ -123,11 +115,10 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 def index(request):
-    # Handle AJAX correction (allow anonymous users)
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        text = (request.POST.get("text") or "").strip()
+        raw_text = (request.POST.get("text") or "").strip()
 
-        if not text:
+        if not raw_text:
             return JsonResponse({
                 "original_text": "",
                 "corrected_text": "",
@@ -135,17 +126,21 @@ def index(request):
                 "error_count": 0,
             })
 
-        corrected = correct_with_openai_sv(text)
-        differences = find_differences_charwise(text, corrected)
+        # ✅ COLLAPSE ONCE, EARLY, AND USE EVERYWHERE
+        collapsed_text = re.sub(r"\s+", " ", raw_text).strip()
+
+        corrected = correct_with_openai_no(collapsed_text)
+        differences = find_differences_charwise(collapsed_text, corrected)
 
         return JsonResponse({
-            "original_text": text,
+            "original_text": collapsed_text,
             "corrected_text": corrected,
             "differences": differences,
             "error_count": len(differences),
         })
 
     return render(request, "checker/index.html")
+
 
 
 from django.contrib.auth.models import User
