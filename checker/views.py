@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (DANISH-CORRECT, COMPOUND-SAFE)
+# CHARWISE DIFF (DANISH-GRADE, ORDER-SAFE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,26 +62,16 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def is_compound_absorption(i1, corr_token):
-        """
-        Detects:
-        privat + livet -> privatlivet
-        """
-        if i1 + 1 >= len(o_tokens):
-            return False
-
-        next_orig = o_tokens[i1 + 1]
-
-        a = re.sub(r"\W", "", corr_token.lower())
-        b = re.sub(r"\W", "", next_orig.lower())
-
-        return a.endswith(b)
-
     def safe_word_replace(o, c):
         o0 = o.lower().strip(".,;:!?")
         c0 = c.lower().strip(".,;:!?")
 
         if not o0 or not c0:
+            return False
+
+        # 🚫 HARD DANISH RULE:
+        # corrected token may NOT be longer than original
+        if len(c0) > len(o0):
             return False
 
         if o0[0] != c0[0]:
@@ -95,19 +85,13 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # -------------------------------------------------
-        # 🚫 IGNORE ALL JOINS / SPLITS
-        # -------------------------------------------------
+        # 🚫 ignore joins / splits completely
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
         if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
-
-            # 🚫 HARD BLOCK: compound absorption
-            if is_compound_absorption(i1, c):
-                continue
 
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
@@ -146,7 +130,7 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (RELAXED)
+# OPENAI CORRECTION (RELAXED – DIFF CONTROLS SAFETY)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
