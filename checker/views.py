@@ -17,44 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# FORCE-SAFE CORRECTED TEXT
-# -------------------------------------------------
-
-def force_no_longer_tokens(original: str, corrected: str) -> str:
-    """
-    Ensures NO corrected token is longer than the corresponding original token.
-    This permanently prevents:
-      privat + livet -> privatlivet
-    """
-    o_tokens = TOKEN_RE.findall(original)
-    c_tokens = TOKEN_RE.findall(corrected)
-
-    out = []
-    i = 0
-
-    for o in o_tokens:
-        if i >= len(c_tokens):
-            out.append(o)
-            continue
-
-        c = c_tokens[i]
-
-        # only compare word tokens
-        if o.isalnum() and c.isalnum():
-            if len(c) > len(o):
-                out.append(o)   # 🔒 force original token
-            else:
-                out.append(c)
-            i += 1
-        else:
-            out.append(c)
-            i += 1
-
-    return "".join(out)
-
-
-# -------------------------------------------------
-# CHARWISE DIFF (DANISH-GRADE, ORDER-SAFE)
+# CHARWISE DIFF (SIMPLE, HARD LENGTH GUARD)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -106,9 +69,6 @@ def find_differences_charwise(original: str, corrected: str):
         if not o0 or not c0:
             return False
 
-        if len(c0) > len(o0):
-            return False
-
         if o0[0] != c0[0]:
             return False
 
@@ -120,21 +80,28 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
+        # Ignore joins / splits entirely
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
         if tag == "replace":
-            o = o_tokens[i1]
-            c = c_tokens[j1]
+            o_tok = o_tokens[i1]
+            c_tok = c_tokens[j1]
 
-            if safe_word_replace(o, c):
+            if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
+                orig_span = orig[s:e]
+
+                # 🔒 ONLY RULE THAT MATTERS
+                if len(c_tok) > len(orig_span):
+                    continue
+
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig[s:e],
-                    "suggestion": c,
+                    "original": orig_span,
+                    "suggestion": c_tok,
                 })
             continue
 
@@ -148,6 +115,7 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": "",
                     "suggestion": c_tokens[j1],
                 })
+            continue
 
         if tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
@@ -159,12 +127,13 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": orig[s:e],
                     "suggestion": "",
                 })
+            continue
 
     return diffs
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION
+# OPENAI CORRECTION (UNCHANGED)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
@@ -177,6 +146,7 @@ def correct_with_openai_no(text: str) -> str:
             "- bøyning\n"
             "- tegnsetting\n"
             "- store og små bokstaver\n\n"
+            "Behold mening og stil.\n"
             "Returner KUN teksten."
         )
 
@@ -212,11 +182,7 @@ def index(request):
                 "error_count": 0,
             })
 
-        raw_corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
-
-        # 🔒 THIS IS THE KILL SWITCH
-        corrected = force_no_longer_tokens(original, raw_corrected)
-
+        corrected = unicodedata.normalize("NFC", correct_with_openai_no(original))
         diffs = find_differences_charwise(original, corrected)
 
         return JsonResponse({
