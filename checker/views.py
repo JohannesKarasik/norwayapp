@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (SAFE, WHITESPACE-AWARE)
+# CHARWISE DIFF (DANISH-GRADE, WHITESPACE SAFE)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,19 +62,26 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
-    def safe_word_replace(a, b):
-        a0 = a.lower().strip(".,;:!?")
-        b0 = b.lower().strip(".,;:!?")
+    def strip_spaces(s: str) -> str:
+        return re.sub(r"\s+", "", s)
 
-        if not a0 or not b0:
+    def safe_word_replace(original_word, corrected_word):
+        o = original_word.lower().strip(".,;:!?")
+        c = corrected_word.lower().strip(".,;:!?")
+
+        if not o or not c:
             return False
-        if a0[0] != b0[0]:
+
+        # 🔒 HARD DANISH RULE:
+        # removing spaces must NOT change character sequence
+        if strip_spaces(o) != strip_spaces(c):
             return False
 
-        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.88
+        # normal similarity check
+        if o[0] != c[0]:
+            return False
 
-    def changes_whitespace(a: str, b: str) -> bool:
-        return re.sub(r"\S", "", a) != re.sub(r"\S", "", b)
+        return difflib.SequenceMatcher(a=o, b=c).ratio() >= 0.88
 
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
@@ -82,39 +89,25 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # -------------------------------------------------
-        # IGNORE join/split (multi-token replace)
-        # -------------------------------------------------
+        # 🚫 ignore joins/splits entirely
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
-        # -------------------------------------------------
-        # SINGLE WORD REPLACE (NO WHITESPACE CHANGE)
-        # -------------------------------------------------
         if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
 
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
-                original_slice = orig[s:e]
-
-                # 🚫 Skip if whitespace would change
-                if changes_whitespace(original_slice, c):
-                    continue
-
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": original_slice,
+                    "original": orig[s:e],
                     "suggestion": c,
                 })
             continue
 
-        # -------------------------------------------------
-        # INSERT punctuation only
-        # -------------------------------------------------
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
@@ -126,9 +119,6 @@ def find_differences_charwise(original: str, corrected: str):
                     "suggestion": c_tokens[j1],
                 })
 
-        # -------------------------------------------------
-        # DELETE punctuation only
-        # -------------------------------------------------
         if tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
@@ -144,7 +134,7 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (DANISH STYLE)
+# OPENAI CORRECTION (NO WHITESPACE TRUST)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
@@ -152,6 +142,7 @@ def correct_with_openai_no(text: str) -> str:
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
             "IKKE slå sammen eller del ord.\n"
+            "IKKE fjern eller legg til mellomrom.\n"
             "IKKE endre rekkefølge på ord.\n\n"
             "Du har lov til å rette:\n"
             "- stavefeil\n"
