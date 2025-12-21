@@ -10,7 +10,7 @@ client = OpenAI()
 logger = logging.getLogger(__name__)
 
 # -------------------------------------------------
-# STRICT CHARWISE DIFF (DANISH-STYLE, NORWAY-SAFE)
+# STRICT CHARWISE DIFF (DANISH-PROVEN LOGIC)
 # -------------------------------------------------
 
 TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
@@ -61,11 +61,14 @@ def find_differences_charwise(original: str, corrected: str):
     def safe_word_replace(a, b):
         a0 = a.lower().strip(".,;:!?")
         b0 = b.lower().strip(".,;:!?")
+
         if not a0 or not b0:
             return False
+
         if a0[0] != b0[0]:
             return False
-        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.9
+
+        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.88
 
     sm = difflib.SequenceMatcher(a=o_tokens, b=c_tokens)
 
@@ -74,14 +77,19 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # IGNORE any join/split (space changes)
-        if tag == "replace" and max(i2 - i1, j2 - j1) > 1:
+        # -------------------------------------------------
+        # IGNORE SPACE JOIN / SPLIT ONLY
+        # -------------------------------------------------
+        if tag == "replace" and (i2 - i1 != 1 or j2 - j1 != 1):
             continue
 
-        # SINGLE WORD REPLACE (strict)
-        if tag == "replace" and (i2 - i1) == 1 and (j2 - j1) == 1:
+        # -------------------------------------------------
+        # SINGLE WORD REPLACE
+        # -------------------------------------------------
+        if tag == "replace":
             o = o_tokens[i1]
             c = c_tokens[j1]
+
             if safe_word_replace(o, c):
                 s, e = span(o_pos, i1, i2)
                 diffs.append({
@@ -93,7 +101,9 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
-        # INSERT punctuation only
+        # -------------------------------------------------
+        # INSERT punctuation
+        # -------------------------------------------------
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
@@ -106,7 +116,9 @@ def find_differences_charwise(original: str, corrected: str):
                 })
             continue
 
-        # DELETE punctuation only
+        # -------------------------------------------------
+        # DELETE punctuation
+        # -------------------------------------------------
         if tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
@@ -123,50 +135,20 @@ def find_differences_charwise(original: str, corrected: str):
 
 
 # -------------------------------------------------
-# WHITESPACE REPAIR (CRITICAL)
-# -------------------------------------------------
-
-def restore_original_whitespace(original: str, corrected: str) -> str:
-    """
-    Keeps corrected characters but forces whitespace
-    (spaces, tabs, newlines) to match the original exactly.
-    """
-    out = []
-    i = j = 0
-
-    while i < len(original) and j < len(corrected):
-        if original[i].isspace():
-            out.append(original[i])
-            i += 1
-            if j < len(corrected) and corrected[j].isspace():
-                j += 1
-        else:
-            out.append(corrected[j])
-            i += 1
-            j += 1
-
-    while i < len(original):
-        out.append(original[i])
-        i += 1
-
-    return "".join(out)
-
-
-# -------------------------------------------------
-# OPENAI CORRECTION
+# OPENAI CORRECTION (NO WHITESPACE HACKS)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
     try:
         prompt = (
             "Du er en profesjonell norsk språkvasker.\n\n"
-            "IKKE legg til eller fjern mellomrom.\n"
-            "IKKE slå sammen eller del ord.\n\n"
-            "Du HAR lov til å rette:\n"
-            "- stavefeil inne i samme ord\n"
-            "- bøyningsfeil\n"
+            "IKKE slå sammen eller del ord.\n"
+            "IKKE legg til eller fjern mellomrom.\n\n"
+            "Du har lov til å rette:\n"
+            "- stavefeil\n"
+            "- bøyning\n"
             "- tegnsetting\n"
-            "- store og små bokstaver\n\n"
+            "- store/små bokstaver\n\n"
             "Returner KUN teksten."
         )
 
@@ -179,15 +161,7 @@ def correct_with_openai_no(text: str) -> str:
             temperature=0,
         )
 
-        corrected = (r.choices[0].message.content or "").strip()
-        if not corrected:
-            return text
-
-        # 🔒 enforce original whitespace but keep other fixes
-        if re.sub(r"\S", "", corrected) != re.sub(r"\S", "", text):
-            corrected = restore_original_whitespace(text, corrected)
-
-        return corrected
+        return (r.choices[0].message.content or "").strip() or text
 
     except Exception:
         logger.exception("OpenAI error")
