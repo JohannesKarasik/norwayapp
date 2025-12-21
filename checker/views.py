@@ -1,96 +1,61 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse, HttpResponse
-
-from io import BytesIO
-import openai
+from django.http import JsonResponse
+from openai import OpenAI
 import os
 import re
 import difflib
 import unicodedata
-from pathlib import Path
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.models import User
-from django.contrib import messages
-from django.conf import settings
-# ---------------------------
-# Load the correct .env file
-# ---------------------------
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-ENV_PATH = BASE_DIR / "punctuation_fixer" / ".env"
 
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# =================================================
+# OPENAI CLIENT
+# =================================================
 
-if not openai.api_key:
-    print("⚠ OPENAI_API_KEY is missing. Expected at:", ENV_PATH)
-
-# Keep for later comma work if needed
-
-
-from openai import OpenAI
-client = OpenAI()
+# Uses OPENAI_API_KEY from environment (systemd/gunicorn env or .env you load elsewhere)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-# ===============================
+# =================================================
 # MAIN VIEW
-# ===============================
+# =================================================
 
 def index(request):
-    is_paying = False
-
-    if request.user.is_authenticated:
-        profile = getattr(request.user, "profile", None)
-        is_paying = profile and profile.subscription_status == "active"
-
-    if request.method == "POST":
-        if not is_paying:
-            return JsonResponse({"requires_payment": True})
-
+    # AJAX POST → return JSON with corrected text + diffs
+    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         text = request.POST.get("text", "")
 
-        if text:
-            corrected_text = correct_with_openai(text)
-
-            print("🧠 DEBUG: Original ->", repr(text))
-            print("🧠 DEBUG: Corrected ->", repr(corrected_text))
-            print("🧠 DEBUG: Same?", text == corrected_text)
-
-            differences = find_differences_charwise(text, corrected_text)
-
-            print("🧩 DEBUG: Differences:", differences)
-            print("🧩 DEBUG: Count:", len(differences))
-            print("--------------------------------")
-
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({
-                    "original_text": text,
-                    "corrected_text": corrected_text,
-                    "differences": differences,
-                    "error_count": len(differences),
-                })
-
-            return render(request, "fixer/index.html", {
-                "text": text,
-                "corrected_text": corrected_text,
-                "differences": differences,
-                "error_count": len(differences),
-                "is_paying": is_paying,
+        if not text.strip():
+            return JsonResponse({
+                "original_text": "",
+                "corrected_text": "",
+                "differences": [],
+                "error_count": 0,
             })
 
-    return render(request, "fixer/index.html", {"is_paying": is_paying})
+        corrected_text = correct_with_openai(text)
+        differences = find_differences_charwise(text, corrected_text)
+
+        return JsonResponse({
+            "original_text": text,
+            "corrected_text": corrected_text,
+            "differences": differences,
+            "error_count": len(differences),
+        })
+
+    # Normal GET (and any non-AJAX POST fallback)
+    return render(request, "checker/index.html")
 
 
-# ===============================
-# OPENAI – NORWEGIAN (MIRRORS DANISH)
-# ===============================
+# =================================================
+# OPENAI – NORWEGIAN (MIRRORS DANISH STYLE)
+# =================================================
 
 def correct_with_openai(text: str) -> str:
     """
-    Produces a fully corrected Norwegian version of the input text:
+    Fully corrects Norwegian text:
     - Fixes spelling, grammar, punctuation, capitalization, and commas
-    - Keeps tone and meaning identical
-    - Avoids stylistic rewriting
+    - Keeps meaning/tone
+    - Avoids stylistic rewriting and extra punctuation
     """
     try:
         base_prompt = (
@@ -112,11 +77,10 @@ def correct_with_openai(text: str) -> str:
             ],
             temperature=0,
         )
-
         corrected = (resp.choices[0].message.content or "").strip()
 
+        # Retry once if model returned unchanged text
         if corrected.strip() == text.strip():
-            print("⚠ No change detected – retrying stricter mode...")
             resp2 = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -141,11 +105,15 @@ def correct_with_openai(text: str) -> str:
         return text
 
 
-# ===============================
+# =================================================
 # DIFF ENGINE (IDENTICAL TO DANISH)
-# ===============================
+# =================================================
 
 def find_differences_charwise(original: str, corrected: str):
+    """
+    Token-level diff with alignment.
+    Highlights small local changes, ignores rewrites/reorders.
+    """
     diffs_out = []
 
     orig_text = unicodedata.normalize("NFC", original)
@@ -163,10 +131,13 @@ def find_differences_charwise(original: str, corrected: str):
     orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
     corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
 
+    # Map original tokens to char spans in original string
     orig_positions = []
     cursor = 0
     for tok in orig_tokens:
         start = orig_text.find(tok, cursor)
+        if start == -1:
+            return []
         end = start + len(tok)
         orig_positions.append((start, end))
         cursor = end
@@ -182,8 +153,11 @@ def find_differences_charwise(original: str, corrected: str):
     def tokens_are_small_edit(a, b):
         a_low = a.lower()
         b_low = b.lower()
+
+        # Case/punctuation-only change
         if a_low.strip(",.;:!?") == b_low.strip(",.;:!?"):
             return True
+
         ratio = difflib.SequenceMatcher(a=a_low, b=b_low).ratio()
         return ratio >= 0.6
 
@@ -197,6 +171,7 @@ def find_differences_charwise(original: str, corrected: str):
             continue
 
         if tag == "replace":
+            # Only accept 1-to-1 small edits
             if (i2 - i1) == 1 and (j2 - j1) == 1:
                 o = orig_tokens[i1]
                 c = corr_tokens[j1]
@@ -211,6 +186,7 @@ def find_differences_charwise(original: str, corrected: str):
                     })
 
         elif tag == "delete":
+            # Only show small deletes (punctuation or tiny tokens)
             if (i2 - i1) == 1:
                 o = orig_tokens[i1]
                 if is_pure_punctuation(o) or len(o) <= 2:
@@ -224,6 +200,7 @@ def find_differences_charwise(original: str, corrected: str):
                     })
 
         elif tag == "insert":
+            # Only show punctuation inserts
             if (j2 - j1) == 1:
                 c = corr_tokens[j1]
                 if is_pure_punctuation(c):
@@ -238,12 +215,15 @@ def find_differences_charwise(original: str, corrected: str):
 
     return diffs_out
 
-# AUTH
-# -------------------------------------------------
 
-from django.contrib.auth.models import User
+# =================================================
+# AUTH (UNCHANGED, KEPT MINIMAL)
+# =================================================
+
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
+from django.contrib.auth.models import User
+
 
 def register(request):
     if request.method != "POST":
@@ -267,6 +247,7 @@ def register(request):
     login(request, user)
     return redirect("/")
 
+
 def login_view(request):
     if request.method != "POST":
         return redirect("/")
@@ -283,6 +264,7 @@ def login_view(request):
 
     login(request, user)
     return redirect("/")
+
 
 def logout_view(request):
     if request.method == "POST":
