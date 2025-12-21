@@ -17,7 +17,7 @@ TOKEN_RE = re.compile(r"\w+(?:-\w+)*|[^\w\s]", re.UNICODE)
 
 
 # -------------------------------------------------
-# CHARWISE DIFF (DANISH-GRADE, ORDER-SAFE)
+# CHARWISE DIFF (WHITESPACE-SAFE + "NEVER LONGER" HARD-GUARD)
 # -------------------------------------------------
 
 def find_differences_charwise(original: str, corrected: str):
@@ -62,6 +62,10 @@ def find_differences_charwise(original: str, corrected: str):
             return pos[a][0], pos[a][0]
         return pos[a][0], pos[b - 1][1]
 
+    # letters/digits/underscore only (unicode safe) – used for "never longer" checks
+    def core_len(s: str) -> int:
+        return len(re.sub(r"[^\w]+", "", s.lower(), flags=re.UNICODE))
+
     def safe_word_replace(o, c):
         o0 = o.lower().strip(".,;:!?")
         c0 = c.lower().strip(".,;:!?")
@@ -69,11 +73,11 @@ def find_differences_charwise(original: str, corrected: str):
         if not o0 or not c0:
             return False
 
-        # 🚫 HARD DANISH RULE:
-        # corrected token may NOT be longer than original
-        if len(c0) > len(o0):
+        # hard: corrected token itself must not be longer than original token
+        if core_len(c0) > core_len(o0):
             return False
 
+        # keep drift low
         if o0[0] != c0[0]:
             return False
 
@@ -85,25 +89,39 @@ def find_differences_charwise(original: str, corrected: str):
         if tag == "equal":
             continue
 
-        # 🚫 ignore joins / splits completely
+        # ignore joins/splits completely (these are the compound/space change cases)
         if tag == "replace" and ((i2 - i1) != 1 or (j2 - j1) != 1):
             continue
 
+        # SINGLE TOKEN REPLACE
         if tag == "replace":
-            o = o_tokens[i1]
-            c = c_tokens[j1]
+            o_tok = o_tokens[i1]
+            c_tok = c_tokens[j1]
 
-            if safe_word_replace(o, c):
+            if safe_word_replace(o_tok, c_tok):
                 s, e = span(o_pos, i1, i2)
+                orig_span = orig[s:e]
+
+                # -------------------------------------------------
+                # 🔒 FINAL HARD GUARD (THIS IS THE FIX)
+                # Even if matching/token alignment gets weird:
+                # NEVER allow a suggestion that is longer than the actual highlighted original.
+                # This makes "privat" -> "privatlivet" impossible.
+                # -------------------------------------------------
+                if core_len(c_tok) > core_len(orig_span):
+                    # logger.debug("Skipping overlong replace: %r -> %r", orig_span, c_tok)
+                    continue
+
                 diffs.append({
                     "type": "replace",
                     "start": s,
                     "end": e,
-                    "original": orig[s:e],
-                    "suggestion": c,
+                    "original": orig_span,
+                    "suggestion": c_tok,
                 })
             continue
 
+        # INSERT punctuation only
         if tag == "insert" and (j2 - j1) == 1:
             if re.fullmatch(r"[.,;:!?]+", c_tokens[j1]):
                 s, _ = span(o_pos, i1, i1)
@@ -114,7 +132,9 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": "",
                     "suggestion": c_tokens[j1],
                 })
+            continue
 
+        # DELETE punctuation only
         if tag == "delete" and (i2 - i1) == 1:
             if re.fullmatch(r"[.,;:!?]+", o_tokens[i1]):
                 s, e = span(o_pos, i1, i2)
@@ -125,12 +145,13 @@ def find_differences_charwise(original: str, corrected: str):
                     "original": orig[s:e],
                     "suggestion": "",
                 })
+            continue
 
     return diffs
 
 
 # -------------------------------------------------
-# OPENAI CORRECTION (RELAXED – DIFF CONTROLS SAFETY)
+# OPENAI CORRECTION (RELAXED – DIFF ENFORCES SAFETY)
 # -------------------------------------------------
 
 def correct_with_openai_no(text: str) -> str:
