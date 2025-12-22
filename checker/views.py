@@ -108,112 +108,170 @@ def correct_with_openai(text: str) -> str:
 # =================================================
 # DIFF ENGINE (IDENTICAL TO DANISH)
 # =================================================
-
 def find_differences_charwise(original: str, corrected: str):
     """
-    Token-level diff with alignment.
-    Highlights small local changes, ignores rewrites/reorders.
+    Robust token diff that:
+    - handles merges/splits (e.g., 'alt for' -> 'altfor', 'e - poster' -> 'e-poster')
+    - returns original-string char spans (start/end) so frontend can highlight precisely
+    - groups adjacent diffs into larger 'areas' to avoid highlighting every single word
     """
-    diffs_out = []
+    orig_text = unicodedata.normalize("NFC", (original or "").replace("\r\n", "\n").replace("\r", "\n"))
+    corr_text = unicodedata.normalize("NFC", (corrected or "").replace("\r\n", "\n").replace("\r", "\n"))
 
-    orig_text = unicodedata.normalize("NFC", original)
-    corr_text = unicodedata.normalize("NFC", corrected)
+    if not orig_text and not corr_text:
+        return []
 
-    def merge_punctuation(tokens):
-        merged = []
-        for tok in tokens:
-            if merged and re.match(r"^[,.:;!?]$", tok):
-                merged[-1] += tok
-            else:
-                merged.append(tok)
-        return merged
+    token_re = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
-    orig_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", orig_text, re.UNICODE))
-    corr_tokens = merge_punctuation(re.findall(r"\w+|[^\w\s]", corr_text, re.UNICODE))
+    def tokens_with_spans(s: str):
+        toks, spans = [], []
+        for m in token_re.finditer(s):
+            toks.append(m.group(0))
+            spans.append((m.start(), m.end()))
+        return toks, spans
 
-    # Map original tokens to char spans in original string
-    orig_positions = []
-    cursor = 0
-    for tok in orig_tokens:
-        start = orig_text.find(tok, cursor)
-        if start == -1:
-            return []
-        end = start + len(tok)
-        orig_positions.append((start, end))
-        cursor = end
+    orig_tokens, orig_spans = tokens_with_spans(orig_text)
+    corr_tokens, corr_spans = tokens_with_spans(corr_text)
 
-    def span_for_range(i_start, i_end):
-        if i_start >= len(orig_positions):
-            return len(orig_text), len(orig_text)
-        if i_start == i_end:
-            s, _ = orig_positions[i_start]
-            return s, s
-        return orig_positions[i_start][0], orig_positions[i_end - 1][1]
+    def span_for_token_range(spans, i1, i2, text_len):
+        """Char span from first token start to last token end, including any whitespace between."""
+        if not spans:
+            return 0, 0
+        if i1 >= len(spans):
+            return text_len, text_len
+        if i1 == i2:
+            # insertion point: before token i1
+            return spans[i1][0], spans[i1][0]
+        return spans[i1][0], spans[i2 - 1][1]
 
-    def tokens_are_small_edit(a, b):
-        a_low = a.lower()
-        b_low = b.lower()
+    def norm_no_space(s: str) -> str:
+        # remove whitespace only; keep punctuation so 'e - poster' ~ 'e-poster'
+        return re.sub(r"\s+", "", s.lower())
 
-        # Case/punctuation-only change
-        if a_low.strip(",.;:!?") == b_low.strip(",.;:!?"):
-            return True
+    def similarity(a: str, b: str) -> float:
+        return difflib.SequenceMatcher(a=a, b=b).ratio()
 
-        ratio = difflib.SequenceMatcher(a=a_low, b=b_low).ratio()
-        return ratio >= 0.6
+    def is_pure_punct(s: str) -> bool:
+        # punctuation-only string (commas, periods, hyphens, etc.)
+        return bool(re.fullmatch(r"[^\w\s]+", s, re.UNICODE))
 
-    def is_pure_punctuation(tok):
-        return bool(re.fullmatch(r"[,.:;!?]+", tok))
+    # Important: disable autojunk (it can behave oddly on short/repetitive text)
+    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens, autojunk=False)
 
-    sm = difflib.SequenceMatcher(a=orig_tokens, b=corr_tokens)
+    raw_diffs = []
 
+    # Build raw diffs from opcodes
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
             continue
 
-        if tag == "replace":
-            # Only accept 1-to-1 small edits
-            if (i2 - i1) == 1 and (j2 - j1) == 1:
-                o = orig_tokens[i1]
-                c = corr_tokens[j1]
-                if tokens_are_small_edit(o, c):
-                    s, e = span_for_range(i1, i2)
-                    diffs_out.append({
-                        "type": "replace",
-                        "start": s,
-                        "end": e,
-                        "original": o,
-                        "suggestion": c,
-                    })
+        o_start, o_end = span_for_token_range(orig_spans, i1, i2, len(orig_text))
+        c_start, c_end = span_for_token_range(corr_spans, j1, j2, len(corr_text))
 
-        elif tag == "delete":
-            # Only show small deletes (punctuation or tiny tokens)
-            if (i2 - i1) == 1:
-                o = orig_tokens[i1]
-                if is_pure_punctuation(o) or len(o) <= 2:
-                    s, e = span_for_range(i1, i2)
-                    diffs_out.append({
-                        "type": "delete",
-                        "start": s,
-                        "end": e,
-                        "original": o,
-                        "suggestion": "",
-                    })
+        o_chunk = orig_text[o_start:o_end]
+        c_chunk = corr_text[c_start:c_end]
+
+        # Keep things local (prevents huge “rewrite” highlights)
+        o_tok_count = i2 - i1
+        c_tok_count = j2 - j1
+        if (o_tok_count + c_tok_count) > 14:
+            continue
+        if (len(o_chunk) + len(c_chunk)) > 180:
+            continue
+
+        if tag == "replace":
+            # Accept if it's basically a local correction OR a whitespace-merge/split
+            # (alt for -> altfor, e - poster -> e-poster, privat livet -> privatlivet)
+            if norm_no_space(o_chunk) == norm_no_space(c_chunk) or similarity(o_chunk.lower(), c_chunk.lower()) >= 0.55:
+                raw_diffs.append({
+                    "type": "replace",
+                    "start": o_start,
+                    "end": o_end,
+                    "original": o_chunk,
+                    "suggestion": c_chunk,
+                    # extra fields (safe if frontend ignores them)
+                    "c_start": c_start,
+                    "c_end": c_end,
+                })
 
         elif tag == "insert":
-            # Only show punctuation inserts
-            if (j2 - j1) == 1:
-                c = corr_tokens[j1]
-                if is_pure_punctuation(c):
-                    s, _ = span_for_range(i1, i1)
-                    diffs_out.append({
-                        "type": "insert",
-                        "start": s,
-                        "end": s,
-                        "original": "",
-                        "suggestion": c,
-                    })
+            # Only surface punctuation inserts (commas/periods/etc.) to avoid spacing issues
+            if c_chunk and is_pure_punct(c_chunk):
+                raw_diffs.append({
+                    "type": "insert",
+                    "start": o_start,
+                    "end": o_start,
+                    "original": "",
+                    "suggestion": c_chunk,
+                    "c_start": c_start,
+                    "c_end": c_end,
+                })
 
-    return diffs_out
+        elif tag == "delete":
+            # Only surface small deletes (usually punctuation / tiny tokens)
+            if o_chunk and (is_pure_punct(o_chunk) or len(o_chunk.strip()) <= 2):
+                raw_diffs.append({
+                    "type": "delete",
+                    "start": o_start,
+                    "end": o_end,
+                    "original": o_chunk,
+                    "suggestion": "",
+                    "c_start": c_start,
+                    "c_end": c_end,
+                })
+
+    if not raw_diffs:
+        return []
+
+    # Sort and GROUP into “areas” (merge diffs separated only by whitespace)
+    raw_diffs.sort(key=lambda d: (d["start"], d["end"]))
+
+    grouped = [raw_diffs[0]]
+    for d in raw_diffs[1:]:
+        prev = grouped[-1]
+
+        gap = orig_text[prev["end"]:d["start"]]
+        gap_is_only_ws = (gap.strip() == "")
+
+        # Merge if edits are basically adjacent (only spaces/newlines between)
+        if gap_is_only_ws and (d["start"] <= prev["end"] + 2):
+            prev["end"] = max(prev["end"], d["end"])
+            prev["start"] = min(prev["start"], d["start"])
+
+            # Rebuild the displayed chunks (covers merges like "alt for" cleanly)
+            prev["original"] = orig_text[prev["start"]:prev["end"]]
+
+            # Best-effort: if we have corrected spans, merge them too
+            if "c_start" in prev and "c_start" in d:
+                prev["c_start"] = min(prev["c_start"], d["c_start"])
+                prev["c_end"] = max(prev["c_end"], d["c_end"])
+                prev["suggestion"] = corr_text[prev["c_start"]:prev["c_end"]]
+            else:
+                # fallback: keep previous suggestion
+                pass
+
+            prev["type"] = "replace"
+        else:
+            grouped.append(d)
+
+    # Optional: dedupe identical spans
+    out = []
+    seen = set()
+    for d in grouped:
+        key = (d["start"], d["end"], d.get("suggestion", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        # Keep only what your frontend expects (extras are okay to keep too)
+        out.append({
+            "type": d["type"],
+            "start": d["start"],
+            "end": d["end"],
+            "original": d["original"],
+            "suggestion": d["suggestion"],
+        })
+
+    return out
 
 
 # =================================================
