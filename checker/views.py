@@ -12,23 +12,82 @@ def extract_words(s: str):
     # "words" = sequences of letters only; punctuation/hyphens/spaces ignored
     return WORD_RE.findall(unicodedata.normalize("NFC", s or ""))
 
+def edit_distance_leq1(a: str, b: str) -> bool:
+    """
+    True if Levenshtein distance <= 1 (fast path).
+    Allows 1 insert/delete/replace.
+    """
+    a = (a or "")
+    b = (b or "")
+    if a == b:
+        return True
+
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+
+    # Same length: at most 1 substitution
+    if la == lb:
+        mismatches = sum(1 for x, y in zip(a, b) if x != y)
+        return mismatches <= 1
+
+    # Ensure a is the shorter
+    if la > lb:
+        a, b = b, a
+        la, lb = lb, la
+
+    # lb = la + 1: at most 1 insertion
+    i = j = 0
+    edits = 0
+    while i < la and j < lb:
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+        else:
+            edits += 1
+            if edits > 1:
+                return False
+            j += 1  # skip one char in longer string
+    return True
+
+
+# Allow-list for common Norwegian confusions that are NOT "synonyms"
+ALLOWED_WORD_SWAPS = {
+    "de": {"dem"},
+    "dem": {"de"},
+    "en": {"enn"},
+    "enn": {"en"},
+    # add more if you want later:
+    # "og": {"å"}, "å": {"og"}  # (optional, only if you want to allow this)
+}
+
 def is_small_word_edit(a: str, b: str) -> bool:
     """
-    Allows spelling/case tweaks, rejects real word substitutions.
+    Allows:
+    - spelling tweaks (1–2 char edits)
+    - short grammar swaps like de/dem, en/enn (allow-list)
+    Rejects:
+    - real rewrites/synonyms (low similarity / large changes)
     """
     a0 = (a or "").lower()
     b0 = (b or "").lower()
+
     if a0 == b0:
         return True
 
-    # Very short words: be strict
-    maxlen = max(len(a0), len(b0))
-    if maxlen <= 3:
-        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.90
+    if a0 in ALLOWED_WORD_SWAPS and b0 in ALLOWED_WORD_SWAPS[a0]:
+        return True
 
-    # Normal words: allow typical typos (profesjonel->profesjonell etc.)
+    maxlen = max(len(a0), len(b0))
+
+    # For short words, use edit distance (SequenceMatcher ratio is misleading here)
+    if maxlen <= 4:
+        return edit_distance_leq1(a0, b0)
+
+    # For normal words, allow typical misspellings
     ratio = difflib.SequenceMatcher(a=a0, b=b0).ratio()
-    return ratio >= 0.70
+    return ratio >= 0.72
+
 
 def violates_no_word_add_remove(original: str, corrected: str) -> bool:
     """
@@ -151,12 +210,24 @@ def correct_with_openai(text: str) -> str:
             "VIKTIGE REGLER (MÅ FØLGES):\n"
             "- IKKE legg til nye ord\n"
             "- IKKE fjern ord\n"
-            "- IKKE bytt ut ord med andre ord (ingen synonymer)\n"
             "- IKKE endre rekkefølgen på ord\n"
-            "- Du kan rette STAVEFEIL inne i eksisterende ord, og rette tegnsetting/komma/store bokstaver/mellomrom\n"
-            "- Hvis en endring krever at et ord må legges til/fjernes, LA DET STÅ\n\n"
+            "- IKKE omskriv setninger eller bruk synonymer\n"
+            "- Du kan rette STAVEFEIL i eksisterende ord\n"
+            "- Du kan rette KORT grammatikk som bytter til riktig form uten å endre antall ord "
+            "(f.eks. de/dem, en/enn)\n"
+            "- Du kan rette tegnsetting og komma der det mangler\n\n"
+            "VIKTIG: Teksten inneholder feil. Du skal finne og rette dem innenfor reglene.\n"
+            "Fang spesielt:\n"
+            "- manglende komma før 'og' i helsetninger\n"
+            "- komma etter innledende leddsetning (f.eks. 'Når ..., er ...')\n"
+            "- rettskriving -> rettskrivning\n"
+            "- gramattikk -> grammatikk\n"
+            "- værre -> verre\n"
+            "- en -> enn\n"
+            "- de -> dem\n\n"
             "Returner KUN den korrigerte teksten uten forklaring."
         )
+
 
         def call_llm(system_prompt: str, user_text: str) -> str:
             resp = client.chat.completions.create(
