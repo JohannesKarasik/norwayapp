@@ -98,11 +98,109 @@ def correct_with_openai(text: str) -> str:
             if corrected2:
                 corrected = corrected2
 
-        return corrected if corrected else text
+        if not corrected:
+            return text
+
+        # ✅ Hard rule: undo pure space-removal merges like "alt for" -> "altfor"
+        corrected = undo_space_merges(text, corrected)
+
+        return corrected
 
     except Exception as e:
         print("❌ OpenAI error:", e)
         return text
+
+
+
+WS_TOKEN_RE = re.compile(r"\s+|\w+|[^\w\s]", re.UNICODE)
+
+def undo_space_merges(original: str, corrected: str, max_merge_words: int = 3) -> str:
+    """
+    Reverts corrections that ONLY merge multiple letter-words by removing spaces:
+      "alt for" -> "altfor"
+      "privat livet" -> "privatlivet"
+
+    It does NOT touch hyphenations like:
+      "e - poster" -> "e-poster"
+    because that's not a pure space-removal merge.
+
+    Keeps original whitespace between the words (so line breaks stay line breaks).
+    """
+    if not original or not corrected:
+        return corrected
+
+    orig_full = WS_TOKEN_RE.findall(unicodedata.normalize("NFC", original))
+    corr_full = WS_TOKEN_RE.findall(unicodedata.normalize("NFC", corrected))
+
+    def is_ws(t: str) -> bool:
+        return t.isspace()
+
+    # Letters-only (no digits/underscore). Works for Norwegian letters too.
+    def is_word(t: str) -> bool:
+        return bool(re.fullmatch(r"[^\W\d_]+", t, re.UNICODE))
+
+    # Build "significant token" lists (no whitespace) + map sig-index -> full-index
+    orig_sig, orig_map = [], []
+    for idx, tok in enumerate(orig_full):
+        if not is_ws(tok):
+            orig_sig.append(tok)
+            orig_map.append(idx)
+
+    corr_sig, corr_map = [], []
+    for idx, tok in enumerate(corr_full):
+        if not is_ws(tok):
+            corr_sig.append(tok)
+            corr_map.append(idx)
+
+    # Lowercase for matching
+    sm = difflib.SequenceMatcher(
+        a=[t.lower() for t in orig_sig],
+        b=[t.lower() for t in corr_sig],
+        autojunk=False,
+    )
+
+    replacements = {}  # corr_full_index -> replacement_string
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag != "replace":
+            continue
+
+        # We only care about N words -> 1 word
+        if (j2 - j1) != 1:
+            continue
+        n = (i2 - i1)
+        if not (2 <= n <= max_merge_words):
+            continue
+
+        corr_tok = corr_sig[j1]
+        if not is_word(corr_tok):
+            continue
+        if not all(is_word(t) for t in orig_sig[i1:i2]):
+            continue
+
+        # Pure merge check: join original words equals corrected word (case-insensitive)
+        if "".join(orig_sig[i1:i2]).lower() != corr_tok.lower():
+            continue
+
+        # Make sure the original region between these word tokens contains ONLY whitespace
+        start_full = orig_map[i1]
+        end_full = orig_map[i2 - 1]
+        between = orig_full[start_full:end_full + 1]
+        if sum(1 for t in between if not is_ws(t)) != n:
+            continue
+
+        replacement_str = "".join(between)  # preserves original whitespace between words
+        corr_full_index = corr_map[j1]
+        replacements[corr_full_index] = replacement_str
+
+    if not replacements:
+        return corrected
+
+    # Apply replacements (no index shifting; we replace token content only)
+    for idx, rep in replacements.items():
+        corr_full[idx] = rep
+
+    return "".join(corr_full)
 
 
 # =================================================
