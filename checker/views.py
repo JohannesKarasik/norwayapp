@@ -167,8 +167,59 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # MAIN VIEW
 # =================================================
 
+
+def chunk_text_preserve(text: str, max_chars: int = 1800):
+    """
+    Split tekst i chunks (bevarer whitespace), så lange tekster ikke kollapser til 0 diffs.
+    Primært på sætninger/linjeskift, fallback til hård split.
+    """
+    if not text:
+        return [""]
+
+    # Split på sætninger + store linjeskift, men behold delimiters i output
+    units = re.findall(r".*?(?:[.!?]+(?:\s+|$)|\n{2,}|$)", text, flags=re.S)
+    units = [u for u in units if u]  # fjern tomme
+
+    if not units:
+        units = [text]
+
+    chunks = []
+    buf = ""
+    for u in units:
+        if len(buf) + len(u) <= max_chars:
+            buf += u
+        else:
+            if buf:
+                chunks.append(buf)
+                buf = ""
+            # Hvis en enkelt unit er for stor, split hårdt
+            if len(u) > max_chars:
+                for i in range(0, len(u), max_chars):
+                    chunks.append(u[i:i + max_chars])
+            else:
+                buf = u
+
+    if buf:
+        chunks.append(buf)
+
+    return chunks
+
+
+def correct_with_openai_chunked(text: str, max_chars: int = 1800) -> str:
+    """
+    Kør korrektur i chunks for lange tekster.
+    """
+    parts = chunk_text_preserve(text, max_chars=max_chars)
+    out = []
+    for p in parts:
+        if p.strip():
+            out.append(correct_with_openai(p))
+        else:
+            out.append(p)
+    return "".join(out)
+
+
 def index(request):
-    # AJAX POST → return JSON with corrected text + diffs
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         text = request.POST.get("text", "")
 
@@ -180,8 +231,24 @@ def index(request):
                 "error_count": 0,
             })
 
-        corrected_text = correct_with_openai(text)
+        # ✅ Chunk correction når teksten er lang
+        if len(text) > 2000:
+            corrected_text = correct_with_openai_chunked(text, max_chars=1800)
+        else:
+            corrected_text = correct_with_openai(text)
+
+        # Normal diff (stram)
         differences = find_differences_charwise(text, corrected_text)
+
+        # ✅ Hvis der ER ændringer men 0 diffs (typisk ved lange tekster / mange kommaer)
+        if not differences and corrected_text.strip() != text.strip():
+            differences = find_differences_charwise(
+                text,
+                corrected_text,
+                max_block_tokens=80,
+                max_block_chars=1200,
+                max_diffs=300,
+            )
 
         return JsonResponse({
             "original_text": text,
@@ -190,8 +257,8 @@ def index(request):
             "error_count": len(differences),
         })
 
-    # Normal GET (and any non-AJAX POST fallback)
     return render(request, "checker/index.html")
+
 
 
 def same_words_exact(a: str, b: str) -> bool:
@@ -431,7 +498,7 @@ def undo_space_merges(original: str, corrected: str, max_merge_words: int = 3) -
 # =================================================
 # DIFF ENGINE (IDENTICAL TO DANISH)
 # =================================================
-def find_differences_charwise(original: str, corrected: str):
+def find_differences_charwise(original: str, corrected: str, max_block_tokens: int = 14, max_block_chars: int = 180, max_diffs: int = 250):
     """
     Robust token diff that:
     - handles merges/splits (e.g., 'alt for' -> 'altfor', 'e - poster' -> 'e-poster')
@@ -497,10 +564,11 @@ def find_differences_charwise(original: str, corrected: str):
         # Keep things local (prevents huge “rewrite” highlights)
         o_tok_count = i2 - i1
         c_tok_count = j2 - j1
-        if (o_tok_count + c_tok_count) > 14:
+        if (o_tok_count + c_tok_count) > max_block_tokens:
             continue
-        if (len(o_chunk) + len(c_chunk)) > 180:
+        if (len(o_chunk) + len(c_chunk)) > max_block_chars:
             continue
+
 
         if tag == "replace":
             # Accept if it's basically a local correction OR a whitespace-merge/split
@@ -593,6 +661,9 @@ def find_differences_charwise(original: str, corrected: str):
             "original": d["original"],
             "suggestion": d["suggestion"],
         })
+
+    return out[:max_diffs]
+
 
     return out
 
