@@ -290,7 +290,7 @@ def insert_commas_with_openai(text: str) -> str:
             ],
             temperature=0,
         )
-        out = (resp.choices[0].message.content or "").strip()
+        out = (resp.choices[0].message.content or "").rstrip(" \t")
         if not out:
             return text
 
@@ -349,7 +349,7 @@ def correct_with_openai(text: str) -> str:
                 ],
                 temperature=0,
             )
-            return (resp.choices[0].message.content or "").strip()
+            return (resp.choices[0].message.content or "").rstrip(" \t")
 
         # 1) First attempt
         corrected = call_llm(base_prompt, text)
@@ -511,7 +511,7 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
     if not orig_text and not corr_text:
         return []
 
-    token_re = re.compile(r"\w+|[^\w\s]", re.UNICODE)
+    token_re = re.compile(r"\n+|\w+|[^\w\s]", re.UNICODE)
 
     def tokens_with_spans(s: str):
         toks, spans = [], []
@@ -623,9 +623,11 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
 
         gap = orig_text[prev["end"]:d["start"]]
         gap_is_only_ws = (gap.strip() == "")
+        gap_has_parabreak = ("\n\n" in gap)
 
-        # Merge if edits are basically adjacent (only spaces/newlines between)
-        if gap_is_only_ws and (d["start"] <= prev["end"] + 2):
+        # Merge kun hvis der ikke er paragrafskift imellem
+        if gap_is_only_ws and (not gap_has_parabreak) and (d["start"] <= prev["end"] + 2):
+
             prev["end"] = max(prev["end"], d["end"])
             prev["start"] = min(prev["start"], d["start"])
 
