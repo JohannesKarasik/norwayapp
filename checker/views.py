@@ -48,6 +48,54 @@ def violates_no_word_add_remove(original: str, corrected: str) -> bool:
 
     return False
 
+
+
+def project_safe_word_corrections(original: str, corrected: str) -> str:
+    """
+    Salvage mode:
+    - Never adds/removes/reorders words
+    - Applies ONLY 1-to-1 small spelling edits to existing words in the original text
+    - Preserves original whitespace/punctuation exactly
+    """
+    orig = unicodedata.normalize("NFC", original or "")
+    corr = unicodedata.normalize("NFC", corrected or "")
+
+    orig_matches = list(WORD_RE.finditer(orig))
+    corr_words = extract_words(corr)
+
+    orig_words = [m.group(0) for m in orig_matches]
+    if not orig_words or not corr_words:
+        return original
+
+    sm = difflib.SequenceMatcher(
+        a=[w.lower() for w in orig_words],
+        b=[w.lower() for w in corr_words],
+        autojunk=False
+    )
+
+    # Collect replacements as (start, end, new_word)
+    reps = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag != "replace":
+            continue
+        if (i2 - i1) == 1 and (j2 - j1) == 1:
+            a = orig_words[i1]
+            b = corr_words[j1]
+            if is_small_word_edit(a, b):  # spelling-level only
+                m = orig_matches[i1]
+                reps.append((m.start(), m.end(), b))
+
+    if not reps:
+        return original
+
+    # Apply from end → start so offsets don't shift
+    out = orig
+    for s, e, nw in sorted(reps, key=lambda x: x[0], reverse=True):
+        out = out[:s] + nw + out[e:]
+
+    return out
+
+
 # =================================================
 # OPENAI CLIENT
 # =================================================
@@ -90,16 +138,14 @@ def index(request):
 # =================================================
 # OPENAI – NORWEGIAN (MIRRORS DANISH STYLE)
 # =================================================
-
 def correct_with_openai(text: str) -> str:
     """
-    Norwegian correction with HARD constraints:
-    - NEVER add/remove words
-    - NEVER reorder words
-    - Only spelling/case/punctuation/spacing fixes are allowed
+    Hard constraints:
+    - never add/remove/reorder words
+    - allow spelling + punctuation + spacing
+    - we also undo pure word-merges like "alt for" -> "altfor"
     """
     try:
-        # Keep the model very constrained
         base_prompt = (
             "Du er en profesjonell norsk korrekturleser.\n\n"
             "VIKTIGE REGLER (MÅ FØLGES):\n"
@@ -107,8 +153,7 @@ def correct_with_openai(text: str) -> str:
             "- IKKE fjern ord\n"
             "- IKKE bytt ut ord med andre ord (ingen synonymer)\n"
             "- IKKE endre rekkefølgen på ord\n"
-            "- IKKE del eller slå sammen ord\n"
-            "- Du kan kun rette STAVEFEIL inne i eksisterende ord, og rette tegnsetting/komma/store bokstaver/mellomrom\n"
+            "- Du kan rette STAVEFEIL inne i eksisterende ord, og rette tegnsetting/komma/store bokstaver/mellomrom\n"
             "- Hvis en endring krever at et ord må legges til/fjernes, LA DET STÅ\n\n"
             "Returner KUN den korrigerte teksten uten forklaring."
         )
@@ -124,39 +169,49 @@ def correct_with_openai(text: str) -> str:
             )
             return (resp.choices[0].message.content or "").strip()
 
+        # 1) First attempt
         corrected = call_llm(base_prompt, text)
         if not corrected:
             return text
 
-        # Undo pure space-removal merges like "alt for" -> "altfor"
         corrected = undo_space_merges(text, corrected)
 
-        # ✅ Hard validation: reject any output that adds/removes/substitutes words
+        # 2) If unchanged, retry once with a nudge (THIS is what you lost before)
+        if corrected.strip() == text.strip():
+            nudge_prompt = base_prompt + (
+                "\n\nTEKSTEN INNEHOLDER FEIL.\n"
+                "Du må rette alle tydelige stavefeil og tegnsettingsfeil innenfor reglene.\n"
+                "Ikke returner identisk tekst hvis det finnes feil."
+            )
+            corrected2 = call_llm(nudge_prompt, text)
+            if corrected2:
+                corrected2 = undo_space_merges(text, corrected2)
+                corrected = corrected2
+
+        # 3) Validate: if model added/removed/substituted whole words → retry strict once
         if violates_no_word_add_remove(text, corrected):
-            strict_prompt = (
-                base_prompt
-                + "\n\nEKSTRA STRIKT:\n"
-                  "- Antall ord i svaret MÅ være identisk med input\n"
-                  "- Hvert ord i output skal være samme ord som input (kun små staveendringer er lov)\n"
-                  "- Ikke forsøk å forbedre setninger eller flyt; bare rett skrivefeil og tegnsetting.\n"
+            strict_prompt = base_prompt + (
+                "\n\nEKSTRA STRIKT:\n"
+                "- Antall ord i svaret MÅ være identisk med input\n"
+                "- Hvert ord i output skal være samme ord som input (kun små staveendringer er lov)\n"
+                "- Ikke forbedre setninger eller flyt; kun rett skrivefeil og tegnsetting.\n"
             )
             corrected2 = call_llm(strict_prompt, text)
             if corrected2:
                 corrected2 = undo_space_merges(text, corrected2)
-
                 if not violates_no_word_add_remove(text, corrected2):
                     return corrected2
 
-            # If still violating, safest is returning original unchanged
-            return text
+            # 4) Salvage instead of returning original:
+            # apply only safe spelling fixes to existing words (keeps word count/order)
+            salvaged = project_safe_word_corrections(text, corrected2 or corrected)
+            return salvaged if salvaged else text
 
         return corrected
 
     except Exception as e:
         print("❌ OpenAI error:", e)
         return text
-
-
 
 
 WS_TOKEN_RE = re.compile(r"\s+|\w+|[^\w\s]", re.UNICODE)
