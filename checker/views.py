@@ -194,6 +194,50 @@ def index(request):
     return render(request, "checker/index.html")
 
 
+def same_words_exact(a: str, b: str) -> bool:
+    # Komma-pass må IKKE ændre bogstaver/ord — kun komma/whitespace.
+    return extract_words(a) == extract_words(b)
+
+def insert_commas_with_openai(text: str) -> str:
+    """
+    Inserts/removes commas ONLY.
+    Must not change words/letters/case. Only commas + whitespace around commas.
+    """
+    try:
+        system_prompt = (
+            "Du er en norsk komma-korrektør.\n\n"
+            "REGLER (MÅ FØLGES):\n"
+            "- Du får en tekst og du skal KUN rette komma.\n"
+            "- IKKE ændr eller ret STAVNING, store/små bogstaver eller ordvalg.\n"
+            "- IKKE tilføj eller fjern ord.\n"
+            "- IKKE ændr rækkefølgen på ord.\n"
+            "- Du må KUN indsætte/fjerne kommaer og evt. justere mellemrum lige omkring komma.\n\n"
+            "Returner KUN teksten."
+        )
+
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            temperature=0,
+        )
+        out = (resp.choices[0].message.content or "").strip()
+        if not out:
+            return text
+
+        # Hard validate: words must be EXACTLY identical
+        if not same_words_exact(text, out):
+            return text
+
+        return out
+
+    except Exception as e:
+        print("❌ OpenAI comma-only error:", e)
+        return text
+
+
 # =================================================
 # OPENAI – NORWEGIAN (MIRRORS DANISH STYLE)
 # =================================================
@@ -276,8 +320,16 @@ def correct_with_openai(text: str) -> str:
             # 4) Salvage instead of returning original:
             # apply only safe spelling fixes to existing words (keeps word count/order)
             salvaged = project_safe_word_corrections(text, corrected2 or corrected)
-            return salvaged if salvaged else text
+            if not salvaged:
+                return text
 
+            # ✅ also run comma-only on salvaged text (safe)
+            salvaged = insert_commas_with_openai(salvaged)
+            return salvaged
+
+
+        # ✅ second pass: comma-only (won't change words)
+        corrected = insert_commas_with_openai(corrected)
         return corrected
 
     except Exception as e:
