@@ -6,6 +6,47 @@ import re
 import difflib
 import unicodedata
 
+WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)  # letters only (handles æøå)
+
+def extract_words(s: str):
+    # "words" = sequences of letters only; punctuation/hyphens/spaces ignored
+    return WORD_RE.findall(unicodedata.normalize("NFC", s or ""))
+
+def is_small_word_edit(a: str, b: str) -> bool:
+    """
+    Allows spelling/case tweaks, rejects real word substitutions.
+    """
+    a0 = (a or "").lower()
+    b0 = (b or "").lower()
+    if a0 == b0:
+        return True
+
+    # Very short words: be strict
+    maxlen = max(len(a0), len(b0))
+    if maxlen <= 3:
+        return difflib.SequenceMatcher(a=a0, b=b0).ratio() >= 0.90
+
+    # Normal words: allow typical typos (profesjonel->profesjonell etc.)
+    ratio = difflib.SequenceMatcher(a=a0, b=b0).ratio()
+    return ratio >= 0.70
+
+def violates_no_word_add_remove(original: str, corrected: str) -> bool:
+    """
+    True if model added/removed/replaced whole words (not just spelling).
+    """
+    ow = extract_words(original)
+    cw = extract_words(corrected)
+
+    # Added/removed words
+    if len(ow) != len(cw):
+        return True
+
+    # Word-by-word substitution (synonyms / rewrites)
+    for a, b in zip(ow, cw):
+        if not is_small_word_edit(a, b):
+            return True
+
+    return False
 
 # =================================================
 # OPENAI CLIENT
@@ -52,63 +93,69 @@ def index(request):
 
 def correct_with_openai(text: str) -> str:
     """
-    Fully corrects Norwegian text:
-    - Fixes spelling, grammar, punctuation, capitalization, and commas
-    - Keeps meaning/tone
-    - Avoids stylistic rewriting and extra punctuation
+    Norwegian correction with HARD constraints:
+    - NEVER add/remove words
+    - NEVER reorder words
+    - Only spelling/case/punctuation/spacing fixes are allowed
     """
     try:
+        # Keep the model very constrained
         base_prompt = (
-            "Du er en profesjonell norsk språkvasker. "
-            "Din oppgave er å returnere teksten i en PERFEKT, grammatisk korrekt "
-            "og naturlig form på norsk. "
-            "Du skal rette ALLE feil i rettskrivning, bøyning, ordstilling, "
-            "store bokstaver, mellomrom og tegnsetting. "
-            "Behold tekstens betydning, stil og tone uendret. "
-            "Legg aldri til ekstra ord, tegn eller utropstegn. "
+            "Du er en profesjonell norsk korrekturleser.\n\n"
+            "VIKTIGE REGLER (MÅ FØLGES):\n"
+            "- IKKE legg til nye ord\n"
+            "- IKKE fjern ord\n"
+            "- IKKE bytt ut ord med andre ord (ingen synonymer)\n"
+            "- IKKE endre rekkefølgen på ord\n"
+            "- IKKE del eller slå sammen ord\n"
+            "- Du kan kun rette STAVEFEIL inne i eksisterende ord, og rette tegnsetting/komma/store bokstaver/mellomrom\n"
+            "- Hvis en endring krever at et ord må legges til/fjernes, LA DET STÅ\n\n"
             "Returner KUN den korrigerte teksten uten forklaring."
         )
 
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": base_prompt},
-                {"role": "user", "content": text},
-            ],
-            temperature=0,
-        )
-        corrected = (resp.choices[0].message.content or "").strip()
-
-        # Retry once if model returned unchanged text
-        if corrected.strip() == text.strip():
-            resp2 = client.chat.completions.create(
+        def call_llm(system_prompt: str, user_text: str) -> str:
+            resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": base_prompt
-                        + " Hvis du er i tvil, rett heller for mye enn for lite. "
-                          "Finn ALLE feil, også små rettskrivnings- og tegnsettingsfeil."
-                    },
-                    {"role": "user", "content": text},
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_text},
                 ],
                 temperature=0,
             )
-            corrected2 = (resp2.choices[0].message.content or "").strip()
-            if corrected2:
-                corrected = corrected2
+            return (resp.choices[0].message.content or "").strip()
 
+        corrected = call_llm(base_prompt, text)
         if not corrected:
             return text
 
-        # ✅ Hard rule: undo pure space-removal merges like "alt for" -> "altfor"
+        # Undo pure space-removal merges like "alt for" -> "altfor"
         corrected = undo_space_merges(text, corrected)
+
+        # ✅ Hard validation: reject any output that adds/removes/substitutes words
+        if violates_no_word_add_remove(text, corrected):
+            strict_prompt = (
+                base_prompt
+                + "\n\nEKSTRA STRIKT:\n"
+                  "- Antall ord i svaret MÅ være identisk med input\n"
+                  "- Hvert ord i output skal være samme ord som input (kun små staveendringer er lov)\n"
+                  "- Ikke forsøk å forbedre setninger eller flyt; bare rett skrivefeil og tegnsetting.\n"
+            )
+            corrected2 = call_llm(strict_prompt, text)
+            if corrected2:
+                corrected2 = undo_space_merges(text, corrected2)
+
+                if not violates_no_word_add_remove(text, corrected2):
+                    return corrected2
+
+            # If still violating, safest is returning original unchanged
+            return text
 
         return corrected
 
     except Exception as e:
         print("❌ OpenAI error:", e)
         return text
+
 
 
 
