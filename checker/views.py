@@ -597,7 +597,6 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
 
         if tag == "replace":
             # Accept if it's basically a local correction OR a whitespace-merge/split
-            # (alt for -> altfor, e - poster -> e-poster, privat livet -> privatlivet)
             if norm_no_space(o_chunk) == norm_no_space(c_chunk) or similarity(o_chunk.lower(), c_chunk.lower()) >= 0.55:
                 raw_diffs.append({
                     "type": "replace",
@@ -605,48 +604,46 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
                     "end": o_end,
                     "original": o_chunk,
                     "suggestion": c_chunk,
-                    # extra fields (safe if frontend ignores them)
                     "c_start": c_start,
                     "c_end": c_end,
                 })
 
-            elif tag == "insert":
-                # Punctuation-only inserts (like a missing comma) often become "0-length" diffs,
-                # which the frontend can't highlight/click. Convert them into a small REPLACE
-                # around nearby tokens, e.g. "vanskelig men" -> "vanskelig, men".
-                if c_chunk and is_pure_punct(c_chunk):
+        elif tag == "insert":
+            # Punctuation-only inserts (like a missing comma) often become "0-length" diffs,
+            # which the frontend can't highlight/click. Convert them into a small REPLACE
+            # around nearby tokens, e.g. "vanskelig men" -> "vanskelig, men".
+            if c_chunk and is_pure_punct(c_chunk):
 
-                    # Expand original context to 1 token left + 1 token right (when possible)
-                    left_i = max(i1 - 1, 0)
-                    right_i = min(i1 + 1, len(orig_tokens))  # range end is exclusive
+                # Expand original context to 1 token left + 1 token right (when possible)
+                left_i = max(i1 - 1, 0)
+                right_i = min(i1 + 1, len(orig_tokens))  # range end is exclusive
 
-                    # Expand corrected context similarly (token before + inserted punct + token after)
-                    left_j = max(j1 - 1, 0)
-                    right_j = min(j2 + 1, len(corr_tokens))
+                # Expand corrected context similarly (token before + inserted punct + token after)
+                left_j = max(j1 - 1, 0)
+                right_j = min(j2 + 1, len(corr_tokens))
 
-                    o_start2, o_end2 = span_for_token_range(orig_spans, left_i, right_i, len(orig_text))
-                    c_start2, c_end2 = span_for_token_range(corr_spans, left_j, right_j, len(corr_text))
+                o_start2, o_end2 = span_for_token_range(orig_spans, left_i, right_i, len(orig_text))
+                c_start2, c_end2 = span_for_token_range(corr_spans, left_j, right_j, len(corr_text))
 
-                    o_chunk2 = orig_text[o_start2:o_end2]
-                    c_chunk2 = corr_text[c_start2:c_end2]
+                o_chunk2 = orig_text[o_start2:o_end2]
+                c_chunk2 = corr_text[c_start2:c_end2]
 
-                    # Keep things local (same safety limits)
-                    if ((right_i - left_i) + (right_j - left_j)) > max_block_tokens:
-                        continue
-                    if (len(o_chunk2) + len(c_chunk2)) > max_block_chars:
-                        continue
+                # Keep things local (same safety limits)
+                if ((right_i - left_i) + (right_j - left_j)) > max_block_tokens:
+                    continue
+                if (len(o_chunk2) + len(c_chunk2)) > max_block_chars:
+                    continue
 
-                    if o_chunk2 != c_chunk2:
-                        raw_diffs.append({
-                            "type": "replace",
-                            "start": o_start2,
-                            "end": o_end2,
-                            "original": o_chunk2,
-                            "suggestion": c_chunk2,
-                            "c_start": c_start2,
-                            "c_end": c_end2,
-                        })
-
+                if o_chunk2 != c_chunk2:
+                    raw_diffs.append({
+                        "type": "replace",
+                        "start": o_start2,
+                        "end": o_end2,
+                        "original": o_chunk2,
+                        "suggestion": c_chunk2,
+                        "c_start": c_start2,
+                        "c_end": c_end2,
+                    })
 
         elif tag == "delete":
             # Only surface small deletes (usually punctuation / tiny tokens)
@@ -660,6 +657,7 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
                     "c_start": c_start,
                     "c_end": c_end,
                 })
+
 
     if not raw_diffs:
         return []
