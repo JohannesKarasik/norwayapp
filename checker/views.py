@@ -305,7 +305,7 @@ def insert_commas_with_openai(text: str) -> str:
         )
 
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
@@ -339,33 +339,34 @@ def correct_with_openai(text: str) -> str:
     """
     try:
         base_prompt = (
-            "Du er en profesjonell norsk korrekturleser.\n\n"
-            "VIKTIGE REGLER (MÅ FØLGES):\n"
+            "Du er en profesjonell norsk korrekturleser (bokmål).\n\n"
+            "MÅL: Rett ALLE stavefeil og ALL tegnsetting, spesielt komma, uten å endre innhold.\n\n"
+            "ABSOLUTTE REGLER (MÅ FØLGES):\n"
             "- IKKE legg til nye ord\n"
             "- IKKE fjern ord\n"
             "- IKKE endre rekkefølgen på ord\n"
-            "- IKKE omskriv setninger eller bruk synonymer\n"
-            "- Du kan rette STAVEFEIL i eksisterende ord\n"
-            "- Du kan rette KORT grammatikk som bytter til riktig form uten å endre antall ord "
-            "(f.eks. de/dem, en/enn)\n"
-            "- Du kan rette tegnsetting og komma der det mangler\n\n"
+            "- IKKE omskriv setninger og IKKE bruk synonymer\n"
+            "- Du kan kun endre bokstaver inni eksisterende ord for å rette stavefeil\n"
+            "- Du kan rette tegnsetting (komma/punktum/kolon/anførselstegn) og mellomrom\n"
+            "- Bevar linjeskift og avsnitt nøyaktig som i input\n\n"
+            "KOMMA-SJEKK (MÅ GJØRES FØR DU SVARER): Gå setning for setning og rett komma når regelen krever det:\n"
+            "1) Komma etter innledende leddsetning:\n"
+            "   Hvis/Når/Da/Dersom/Selv om/Fordi/Siden/Mens/Etter at/Før/For at/Om ... ,\n"
+            "2) Komma rundt innskutte leddsetninger/parentetiske innskudd.\n"
+            "3) Komma før 'og/men/for/eller' når det binder sammen to helsetninger "
+            "(begge har eget subjekt + verbal).\n"
+            "4) Komma i oppramsing når det trengs for tydelighet.\n"
+            "5) IKKE sett komma mellom subjekt og verbal i en enkel helsetning.\n\n"
             "VIKTIG: Teksten inneholder feil. Du skal finne og rette dem innenfor reglene.\n"
-            "Fang spesielt:\n"
-            "- manglende komma før 'og' i helsetninger\n"
-            "- komma etter innledende leddsetning (f.eks. 'Når ..., er ...')\n"
-            "- rettskriving -> rettskrivning\n"
-            "- gramattikk -> grammatikk\n"
-            "- værre -> verre\n"
-            "- en -> enn\n"
-            "- de -> dem\n\n"
-
-            "Returner KUN den korrigerte teksten uten forklaring."
+            "Ikke returner identisk tekst hvis det finnes kommafeil eller tydelige skrivefeil.\n\n"
+            "Returner KUN den korrigerte teksten. Ingen forklaring."
         )
+
 
 
         def call_llm(system_prompt: str, user_text: str) -> str:
             resp = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_text},
@@ -385,9 +386,10 @@ def correct_with_openai(text: str) -> str:
         if corrected.strip() == text.strip():
             nudge_prompt = base_prompt + (
                 "\n\nTEKSTEN INNEHOLDER FEIL.\n"
-                "Du må rette alle tydelige stavefeil og tegnsettingsfeil innenfor reglene.\n"
-                "Ikke returner identisk tekst hvis det finnes feil."
+                "Du må rette alle tydelige stavefeil OG alle kommafeil innenfor reglene.\n"
+                "Kjør KOMMA-SJEKKEN (punkt 1–5) setning for setning og ikke returner identisk tekst hvis noen komma mangler/er feil."
             )
+
             corrected2 = call_llm(nudge_prompt, text)
             if corrected2:
                 corrected2 = undo_space_merges(text, corrected2)
