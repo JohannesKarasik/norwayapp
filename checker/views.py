@@ -6,6 +6,28 @@ import re
 import difflib
 import unicodedata
 
+# --- Paste normalization (Google Docs, Word, etc.) ---
+ZERO_WIDTH_RE = re.compile(r"[\u200B\u200C\u200D\u2060\uFEFF]")  # ZWSP/ZWNJ/ZWJ/WJ/BOM
+
+def normalize_pasted_text(s: str) -> str:
+    if s is None:
+        return ""
+    s = unicodedata.normalize("NFC", s)
+
+    # Normalize all common "line break" variants to \n
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    s = s.replace("\u2028", "\n").replace("\u2029", "\n")  # Unicode LS/PS
+    s = s.replace("\u000b", "\n").replace("\u000c", "\n")  # VT/FF
+
+    # Normalize non-breaking spaces to normal spaces
+    s = s.replace("\u00a0", " ").replace("\u202f", " ").replace("\u2007", " ")
+
+    # Remove invisible zero-width characters (they break matching/diffs)
+    s = ZERO_WIDTH_RE.sub("", s)
+
+    return s
+
+
 WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)  # letters only (handles æøå)
 
 def extract_words(s: str):
@@ -221,7 +243,7 @@ def correct_with_openai_chunked(text: str, max_chars: int = 1800) -> str:
 
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        text = request.POST.get("text", "")
+        text = normalize_pasted_text(request.POST.get("text", ""))
 
         if not text.strip():
             return JsonResponse({
@@ -336,6 +358,7 @@ def correct_with_openai(text: str) -> str:
             "- værre -> verre\n"
             "- en -> enn\n"
             "- de -> dem\n\n"
+
             "Returner KUN den korrigerte teksten uten forklaring."
         )
 
@@ -511,7 +534,7 @@ def find_differences_charwise(original: str, corrected: str, max_block_tokens: i
     if not orig_text and not corr_text:
         return []
 
-    token_re = re.compile(r"\n+|\w+|[^\w\s]", re.UNICODE)
+    token_re = re.compile(r"\w+|[^\w\s]", re.UNICODE)
 
     def tokens_with_spans(s: str):
         toks, spans = [], []
