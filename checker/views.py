@@ -287,13 +287,23 @@ def same_words_exact(a: str, b: str) -> bool:
     # Komma-pass må IKKE ændre bogstaver/ord — kun komma/whitespace.
     return extract_words(a) == extract_words(b)
 
-
 ONLY_COMMA_WS_RE = re.compile(r"^[\s,]*$", re.UNICODE)
+
+def _adjacent_has_comma(orig: str, i1: int, i2: int, cand: str, j1: int, j2: int) -> bool:
+    def ch(s: str, idx: int) -> str:
+        return s[idx] if 0 <= idx < len(s) else ""
+    # Check character right before/after the edited segment in either string
+    return (
+        ch(orig, i1 - 1) == "," or ch(orig, i2) == "," or
+        ch(cand, j1 - 1) == "," or ch(cand, j2) == ","
+    )
 
 def keep_only_comma_changes(original: str, candidate: str) -> str:
     """
-    Keep ONLY comma insert/remove + whitespace changes.
-    Revert anything else back to original (hyphens, spelling, merges, etc.).
+    Keep ONLY:
+    - comma insert/remove
+    - whitespace changes that are directly adjacent to a comma (space after comma etc.)
+    Reject whitespace changes elsewhere (prevents merges like 'privat livet' -> 'privatlivet').
     """
     orig = unicodedata.normalize("NFC", original or "")
     cand = unicodedata.normalize("NFC", candidate or "")
@@ -312,13 +322,20 @@ def keep_only_comma_changes(original: str, candidate: str) -> str:
         oseg = orig[i1:i2]
         cseg = cand[j1:j2]
 
-        # allow ONLY commas + whitespace changes
-        if ONLY_COMMA_WS_RE.match(oseg) and ONLY_COMMA_WS_RE.match(cseg):
-            out.append(cseg)
+        # Only allow edits that are commas/whitespace
+        if ONLY_COMMA_WS_RE.fullmatch(oseg) and ONLY_COMMA_WS_RE.fullmatch(cseg):
+            # Always allow if a comma is involved, or the edit touches a comma
+            if ("," in oseg) or ("," in cseg) or _adjacent_has_comma(orig, i1, i2, cand, j1, j2):
+                out.append(cseg)
+            else:
+                # Disallow whitespace-only edits away from commas (prevents word merges/splits)
+                out.append(oseg)
         else:
+            # Revert anything else (word changes, hyphens, etc.)
             out.append(oseg)
 
     return "".join(out)
+
 
 
 def insert_commas_with_openai(text: str) -> str:
@@ -334,7 +351,9 @@ def insert_commas_with_openai(text: str) -> str:
             "- IKKE ændr eller ret STAVNING, store/små bogstaver eller ordvalg.\n"
             "- IKKE tilføj eller fjern ord.\n"
             "- IKKE ændr rækkefølgen på ord.\n"
-            "- Du må KUN indsætte/fjerne kommaer og evt. justere mellemrum lige omkring komma.\n\n"
+            "- Du kan KUN sette inn/fjerne komma.\n"
+            "- Du kan KUN endre mellomrom rett før eller rett etter et komma.\n"
+            "- Du må ALDRI fjerne/legge til mellomrom mellom to ord (ikke slå sammen eller splitte ord).\n\n"
             "Returner KUN teksten."
         )
 
@@ -350,10 +369,12 @@ def insert_commas_with_openai(text: str) -> str:
         if not out:
             return text
 
-        # Hard validate: words must be EXACTLY identical
-# Keep only comma + whitespace changes (prevents eposter->e-poster etc. from nuking commas)
+                # Hard validate: words must be EXACTLY identical
+        # Keep only comma + whitespace changes (prevents eposter->e-poster etc. from nuking commas)
         safe = keep_only_comma_changes(text, out)
+        safe = undo_space_merges(text, safe)  # extra safety if model still tries to merge words
         return safe
+
 
 
     except Exception as e:
