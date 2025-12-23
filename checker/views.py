@@ -287,6 +287,40 @@ def same_words_exact(a: str, b: str) -> bool:
     # Komma-pass må IKKE ændre bogstaver/ord — kun komma/whitespace.
     return extract_words(a) == extract_words(b)
 
+
+ONLY_COMMA_WS_RE = re.compile(r"^[\s,]*$", re.UNICODE)
+
+def keep_only_comma_changes(original: str, candidate: str) -> str:
+    """
+    Keep ONLY comma insert/remove + whitespace changes.
+    Revert anything else back to original (hyphens, spelling, merges, etc.).
+    """
+    orig = unicodedata.normalize("NFC", original or "")
+    cand = unicodedata.normalize("NFC", candidate or "")
+
+    if not orig or not cand:
+        return original
+
+    sm = difflib.SequenceMatcher(a=orig, b=cand, autojunk=False)
+    out = []
+
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            out.append(orig[i1:i2])
+            continue
+
+        oseg = orig[i1:i2]
+        cseg = cand[j1:j2]
+
+        # allow ONLY commas + whitespace changes
+        if ONLY_COMMA_WS_RE.match(oseg) and ONLY_COMMA_WS_RE.match(cseg):
+            out.append(cseg)
+        else:
+            out.append(oseg)
+
+    return "".join(out)
+
+
 def insert_commas_with_openai(text: str) -> str:
     """
     Inserts/removes commas ONLY.
@@ -317,10 +351,10 @@ def insert_commas_with_openai(text: str) -> str:
             return text
 
         # Hard validate: words must be EXACTLY identical
-        if not same_words_exact(text, out):
-            return text
+# Keep only comma + whitespace changes (prevents eposter->e-poster etc. from nuking commas)
+        safe = keep_only_comma_changes(text, out)
+        return safe
 
-        return out
 
     except Exception as e:
         print("❌ OpenAI comma-only error:", e)
