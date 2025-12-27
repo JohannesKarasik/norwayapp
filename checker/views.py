@@ -821,12 +821,14 @@ def login_view(request):
     )
 
     if user is None:
-        messages.error(request, "Feil e-post eller passord.")
+        messages.error(
+            request,
+            "Denne kontoen finnes ikke, eller passordet er feil."
+        )
         return redirect("/")
 
     login(request, user)
     return redirect("/")
-
 
 def logout_view(request):
     if request.method == "POST":
