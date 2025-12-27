@@ -582,6 +582,11 @@
    margin-inline: auto;
  }
  </style>
+
+<script>
+  window.IS_AUTHENTICATED = {% if request.user.is_authenticated %}true{% else %}false{% endif %};
+</script>
+
  <script>
   (function () {
   console.log("✅ main.js loaded");
@@ -867,10 +872,17 @@ document.addEventListener("click", (e) => {
      SUBMIT
   --------------------------------*/
   form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-  
-    const text = lastPlainText.trim();
-    if (!text) return;
+  e.preventDefault();
+
+  // 🔒 Require login before using the tool
+  if (!window.IS_AUTHENTICATED) {
+    if (window.openRegisterModal) window.openRegisterModal();
+    return;
+  }
+
+  const text = lastPlainText.trim();
+  if (!text) return;
+
   
     // 🚫 HARD STOP — NEVER allow loading when too long
     const wordCount = countWords(text);
@@ -1236,4 +1248,5 @@ document.addEventListener("click", (e) => {
   
   })();
   </script>
+  
   

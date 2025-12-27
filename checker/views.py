@@ -241,8 +241,13 @@ def correct_with_openai_chunked(text: str, max_chars: int = 1800) -> str:
     return "".join(out)
 
 
+from django.http import JsonResponse
+
 def index(request):
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+        if not request.user.is_authenticated:
+            return JsonResponse({"error": "auth_required"}, status=401)
+
         text = normalize_pasted_text(request.POST.get("text", ""))
 
         if not text.strip():
