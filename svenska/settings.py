@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +22,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-o_(@uoem2n4f^w@_*rxisgx%t-56m_xc$j8o*cr(_4x2^lu%+@'
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "unsafe-dev-secret-key"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -29,19 +34,6 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '64.23.135.75', 'rettskrivingsjekk.co
 
 
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "DEBUG",
-    },
-}
 
 # Application definition
 
@@ -148,3 +140,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
+# =========================
+# STRIPE CONFIGURATION
+# =========================
+
+STRIPE_MODE = os.getenv("STRIPE_MODE", "test")
+
+if STRIPE_MODE == "live":
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_LIVE_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_LIVE_PUBLISHABLE_KEY")
+    STRIPE_PRICE_ID = os.getenv("STRIPE_LIVE_PRICE_ID")
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_LIVE_WEBHOOK_SECRET")
+else:
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_TEST_SECRET_KEY")
+    STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_TEST_PUBLISHABLE_KEY")
+    STRIPE_PRICE_ID = os.getenv("STRIPE_TEST_PRICE_ID")
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_TEST_WEBHOOK_SECRET")
