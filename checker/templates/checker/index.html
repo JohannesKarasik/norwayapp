@@ -272,7 +272,7 @@
     <p id="pay-modal-desc" class="pay-modal__subtext">
       Du får full tilgang i 30 dager helt gratis.
       Ønsker du å fortsette etter prøveperioden,
-      koster det 49 kr per måned.
+      koster det 69 kr per måned.
       Du kan når som helst avslutte før prøveperioden utløper.
     </p>
 
@@ -642,39 +642,125 @@
 }
 
 
-/* =========================
-   PAYMENT MODAL VISIBILITY
-   ========================= */
+/* ===== Payment Modal (scoped) ===== */
+:root {
+  --pm-overlay: rgba(17, 24, 39, 0.6);
+  --pm-bg: #ffffff;
+  --pm-text: #0f172a;
+  --pm-muted: #475569;
 
-   .pay-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;               /* 🔑 higher than header + other modals */
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* BRAND COLORS HERE */
+  --pm-primary: #057e6f;
+  --pm-primary-hover: #04695d;
+
+  --pm-ring: 0 0 0 3px rgba(5, 126, 111, 0.30);
+  --pm-radius: 14px;
+  --pm-shadow: 0 12px 40px rgba(2, 6, 23, 0.25);
 }
 
-/* Hide ONLY when [hidden] */
-.pay-modal[hidden] {
-  display: none !important;
+.pay-modal[hidden] { display: none !important; }
+
+.pay-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+  color: var(--pm-text);
 }
 
 .pay-modal__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(3px);
+  background: var(--pm-overlay);
+  backdrop-filter: blur(2px);
 }
 
 .pay-modal__content {
   position: relative;
-  background: #fff;
-  border-radius: 18px;
-  max-width: 640px;
+  width: min(560px, 100%);
+  background: var(--pm-bg);
+  border-radius: var(--pm-radius);
+  box-shadow: var(--pm-shadow);
+  padding: 28px 24px 24px;
+  transform: translateY(10px);
+  opacity: 0;
+  animation: pm-in 220ms ease-out forwards;
+}
+
+.pay-modal__content--wide { max-width: 560px; }
+
+@keyframes pm-in {
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.pay-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 24px;
+  line-height: 1;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.pay-modal__close:hover { background: #f1f5f9; }
+.pay-modal__close:focus-visible { outline: none; box-shadow: var(--pm-ring); }
+
+.pay-modal__badge {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pm-primary);
+  background: #e9f8f6;
+  border: 1px solid #b4e8df;
+  border-radius: 999px;
+}
+
+.pay-modal h2 {
+  margin: 4px 0 8px;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.pay-modal__subtext {
+  margin: 0 0 18px;
+  color: var(--pm-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.pay-modal__cta {
   width: 100%;
-  padding: 32px;
-  box-shadow: 0 20px 40px rgba(0,0,0,.25);
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  background: var(--pm-primary);
+  color: #fff;
+  padding: 14px 16px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 120ms ease, transform 60ms ease;
+  box-shadow: 0 8px 18px rgba(5,126,111,0.25);
+}
+.pay-modal__cta:hover { background: var(--pm-primary-hover); }
+.pay-modal__cta:active { transform: translateY(1px); }
+.pay-modal__cta:focus-visible { outline: none; box-shadow: var(--pm-ring); }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pay-modal__content { animation: none; opacity: 1; transform: none; }
+  .pay-modal__cta { transition: none; }
 }
 
 
