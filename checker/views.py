@@ -926,9 +926,16 @@ def create_checkout_session(request):
 from django.contrib.auth.models import User
 from .models import Profile
 
-
 @csrf_exempt
 def stripe_webhook(request):
+    import stripe
+    from django.conf import settings
+    from django.http import HttpResponse
+    from django.contrib.auth.models import User
+    from .models import Profile
+
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
@@ -938,7 +945,7 @@ def stripe_webhook(request):
             sig_header,
             settings.STRIPE_WEBHOOK_SECRET,
         )
-    except Exception:
+    except Exception as e:
         return HttpResponse(status=400)
 
     if event["type"] == "checkout.session.completed":
