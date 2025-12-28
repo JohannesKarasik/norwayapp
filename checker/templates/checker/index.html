@@ -767,9 +767,11 @@
 
  </style>
 
+
 <script>
-  window.IS_AUTHENTICATED = {% if request.user.is_authenticated %}true{% else %}false{% endif %};
-  window.IS_PAYING = {% if request.user.is_authenticated and request.user.profile.is_paying %}true{% else %}false{% endif %};
+  window.IS_AUTHENTICATED = {{ request.user.is_authenticated|yesno:"true,false" }};
+  window.IS_PAYING = {{ is_paying|yesno:"true,false" }};
+  console.log("IS_PAYING (server) =", window.IS_PAYING);
 </script>
 
 
@@ -1115,13 +1117,6 @@ if (!window.IS_PAYING) {
         }
         return;
       }
-
-      if (res.status === 402) {
-      submit.disabled = false;
-      submit.classList.remove("is-loading");
-      window.openPaymentModal();
-      return;
-    }
 
   
       const data = await res.json();
