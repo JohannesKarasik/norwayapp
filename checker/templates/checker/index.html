@@ -1316,6 +1316,33 @@ if (!window.IS_PAYING) {
   })();
   </script>
 
+<script>
+  const paymentModal = document.getElementById("payment-modal");
+  const paymentClose = document.getElementById("payment-close");
+
+  function openPaymentModal() {
+    if (!paymentModal) {
+      console.error("❌ payment-modal not found in DOM");
+      return;
+    }
+    paymentModal.classList.add("active");
+    paymentModal.setAttribute("aria-hidden", "false");
+  }
+
+  function closePaymentModal() {
+    if (!paymentModal) return;
+    paymentModal.classList.remove("active");
+    paymentModal.setAttribute("aria-hidden", "true");
+  }
+
+  paymentClose?.addEventListener("click", closePaymentModal);
+  paymentModal?.querySelector(".modal__overlay")?.addEventListener("click", closePaymentModal);
+
+  // 🔑 THIS IS THE IMPORTANT LINE
+  window.openPaymentModal = openPaymentModal;
+</script>
+
+
 {% if messages %}
 <script>
   window.addEventListener("DOMContentLoaded", () => {
@@ -1326,26 +1353,7 @@ if (!window.IS_PAYING) {
 </script>
 
 
-<script>
-  const paymentModal = document.getElementById("payment-modal");
-const paymentClose = document.getElementById("payment-close");
 
-function openPaymentModal(){
-  paymentModal.classList.add("active");
-  paymentModal.setAttribute("aria-hidden", "false");
-}
-
-function closePaymentModal(){
-  paymentModal.classList.remove("active");
-  paymentModal.setAttribute("aria-hidden", "true");
-}
-
-paymentClose?.addEventListener("click", closePaymentModal);
-paymentModal?.querySelector(".modal__overlay")?.addEventListener("click", closePaymentModal);
-
-window.openPaymentModal = openPaymentModal;
-
-</script>
 {% endif %}
 
   
