@@ -862,58 +862,69 @@ def logout_view(request):
         logout(request)
     return redirect("/")
 
+# checker/views.py
+
 import stripe
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
+@csrf_exempt
 @require_POST
 @login_required
 def create_checkout_session(request):
+    """
+    Creates a Stripe Checkout Session for a subscription with trial.
+    Redirects user back to `/` on success.
+    User access is unlocked via webhook (source of truth).
+    """
+
+    # Safety: make sure user has an email (Stripe prefers it)
+    customer_email = request.user.email or None
+
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
-            customer_email=request.user.email,
-            line_items=[{
-                "price": settings.STRIPE_PRICE_ID,
-                "quantity": 1,
-            }],
+
+            # 🔑 THIS IS CRITICAL — used by webhook
+            client_reference_id=request.user.id,
+
+            customer_email=customer_email,
+
+            line_items=[
+                {
+                    "price": settings.STRIPE_PRICE_ID,
+                    "quantity": 1,
+                }
+            ],
+
             subscription_data={
                 "trial_period_days": 30,
             },
-            success_url = request.build_absolute_uri(
-                    "/?checkout=success"
-                ),
+
+            success_url=request.build_absolute_uri("/"),
             cancel_url=request.build_absolute_uri("/"),
-            metadata={
-                "user_id": request.user.id,
-            },
+
+            allow_promotion_codes=True,
         )
 
         return JsonResponse({"url": session.url})
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
-    
+        return JsonResponse(
+            {"error": str(e)},
+            status=400
+        )
 
-import json
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
-from django.conf import settings
-import stripe
+# checker/views.py (same file)
 
-# checker/views.py
-import stripe
-from django.conf import settings
-from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
-
-stripe.api_key = settings.STRIPE_SECRET_KEY
+from .models import Profile
 
 
 @csrf_exempt
@@ -933,13 +944,14 @@ def stripe_webhook(request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
 
-        # 👇 THIS IS KEY
         user_id = session.get("client_reference_id")
         if user_id:
-            user = User.objects.get(id=user_id)
-            user.profile.is_paying = True
-            user.profile.save()
+            try:
+                user = User.objects.get(id=user_id)
+                profile, _ = Profile.objects.get_or_create(user=user)
+                profile.is_paying = True
+                profile.save()
+            except User.DoesNotExist:
+                pass
 
     return HttpResponse(status=200)
-
-

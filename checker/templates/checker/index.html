@@ -1480,25 +1480,51 @@ if (!window.IS_PAYING) {
 </script>
 
 <script>
-  document.getElementById("start-checkout")?.addEventListener("click", async () => {
-    try {
-      const res = await fetch("/create-checkout-session/", {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
-          "Content-Type": "application/json",
-        },
-      });
+  (function () {
+    const checkoutBtn = document.getElementById("start-checkout");
+    if (!checkoutBtn) return;
 
-      const data = await res.json();
-      if (!data.url) throw new Error("No checkout URL");
+    checkoutBtn.addEventListener("click", async function (e) {
+      e.preventDefault();
 
-      window.location.href = data.url;
-    } catch (err) {
-      alert("Noe gikk galt. Prøv igjen.");
-      console.error(err);
-    }
-  });
+      try {
+        const csrfToken = document.querySelector(
+          "input[name=csrfmiddlewaretoken]"
+        )?.value;
+
+        if (!csrfToken) {
+          alert("Sikkerhetstoken mangler. Last siden på nytt.");
+          return;
+        }
+
+        const res = await fetch("/create-checkout-session/", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "Content-Type": "application/json",
+          },
+          credentials: "same-origin",
+        });
+
+        if (!res.ok) {
+          throw new Error("Checkout request failed");
+        }
+
+        const data = await res.json();
+
+        if (!data.url) {
+          throw new Error("Stripe URL mangler");
+        }
+
+        // 🚀 Redirect to Stripe Checkout
+        window.location.href = data.url;
+
+      } catch (err) {
+        console.error("Stripe checkout error:", err);
+        alert("Noe gikk galt. Prøv igjen om et øyeblikk.");
+      }
+    });
+  })();
 </script>
 
 
