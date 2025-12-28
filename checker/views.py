@@ -906,6 +906,16 @@ from django.http import HttpResponse
 from django.conf import settings
 import stripe
 
+# checker/views.py
+import stripe
+from django.conf import settings
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.models import User
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+
 @csrf_exempt
 def stripe_webhook(request):
     payload = request.body
@@ -915,20 +925,21 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload,
             sig_header,
-            settings.STRIPE_WEBHOOK_SECRET
+            settings.STRIPE_WEBHOOK_SECRET,
         )
     except Exception:
         return HttpResponse(status=400)
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        user_id = session["metadata"].get("user_id")
 
+        # 👇 THIS IS KEY
+        user_id = session.get("client_reference_id")
         if user_id:
-            from django.contrib.auth.models import User
             user = User.objects.get(id=user_id)
             user.profile.is_paying = True
             user.profile.save()
 
     return HttpResponse(status=200)
+
 
