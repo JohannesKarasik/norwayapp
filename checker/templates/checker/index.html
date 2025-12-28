@@ -1542,4 +1542,14 @@ if (!window.IS_PAYING) {
 {% endif %}
 
   
-  
+<script>
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get("checkout") === "success") {
+    // Temporary unlock until webhook updates DB
+    window.IS_PAYING = true;
+
+    // Clean URL
+    history.replaceState({}, "", "/");
+  }
+</script>
