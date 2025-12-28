@@ -254,23 +254,35 @@
 
 
 <!-- PAYMENT MODAL -->
-<div class="modal" id="payment-modal" aria-hidden="true">
-  <div class="modal__overlay"></div>
-  <div class="modal__content" role="dialog" aria-modal="true">
+<div id="paymentModal" class="pay-modal" role="dialog" aria-modal="true"
+     aria-labelledby="pay-modal-title" aria-describedby="pay-modal-desc" hidden>
+  <div class="pay-modal__overlay" data-close-modal></div>
 
-    <button class="modal__close" id="payment-close">×</button>
+  <div class="pay-modal__content pay-modal__content--wide" role="document">
+    <button class="pay-modal__close" aria-label="Lukk">
+      &times;
+    </button>
 
-    <h2 class="subheading">Oppgrader for å rette tekst</h2>
-    <p class="sub">
-      Du må ha et aktivt abonnement for å bruke Rettskriving Sjekk.
+    <div class="pay-modal__badge" aria-hidden="true">
+      30 dagers gratis prøve
+    </div>
+
+    <h2 id="pay-modal-title">Få tilgang til Rettskriving Sjekk</h2>
+
+    <p id="pay-modal-desc" class="pay-modal__subtext">
+      Du får full tilgang i 30 dager helt gratis.
+      Ønsker du å fortsette etter prøveperioden,
+      koster det 49 kr per måned.
+      Du kan når som helst avslutte før prøveperioden utløper.
     </p>
 
-    <a href="/subscribe/" class="btn btn--primary" style="width:100%">
-      Oppgrader nå
-    </a>
-
+    <button class="pay-modal__cta"
+            onclick="window.location.href='/create-checkout-session/'">
+      Start gratis prøve
+    </button>
   </div>
 </div>
+
 
 
 
@@ -1317,30 +1329,33 @@ if (!window.IS_PAYING) {
   </script>
 
 <script>
-  const paymentModal = document.getElementById("payment-modal");
-  const paymentClose = document.getElementById("payment-close");
+  (function () {
+    const modal = document.getElementById("paymentModal");
 
-  function openPaymentModal() {
-    if (!paymentModal) {
-      console.error("❌ payment-modal not found in DOM");
-      return;
+    function openPaymentModal() {
+      if (!modal) {
+        console.error("❌ paymentModal not found");
+        return;
+      }
+      modal.hidden = false;
     }
-    paymentModal.classList.add("active");
-    paymentModal.setAttribute("aria-hidden", "false");
-  }
 
-  function closePaymentModal() {
-    if (!paymentModal) return;
-    paymentModal.classList.remove("active");
-    paymentModal.setAttribute("aria-hidden", "true");
-  }
+    function closePaymentModal() {
+      if (!modal) return;
+      modal.hidden = true;
+    }
 
-  paymentClose?.addEventListener("click", closePaymentModal);
-  paymentModal?.querySelector(".modal__overlay")?.addEventListener("click", closePaymentModal);
+    modal?.querySelector(".pay-modal__close")
+      ?.addEventListener("click", closePaymentModal);
 
-  // 🔑 THIS IS THE IMPORTANT LINE
-  window.openPaymentModal = openPaymentModal;
+    modal?.querySelector("[data-close-modal]")
+      ?.addEventListener("click", closePaymentModal);
+
+    // 🔑 expose globally (THIS fixes your error)
+    window.openPaymentModal = openPaymentModal;
+  })();
 </script>
+
 
 
 {% if messages %}
