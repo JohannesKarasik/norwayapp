@@ -276,10 +276,10 @@
       Du kan når som helst avslutte før prøveperioden utløper.
     </p>
 
-    <button class="pay-modal__cta"
-            onclick="window.location.href='/create-checkout-session/'">
+    <button class="pay-modal__cta" id="start-checkout">
       Start gratis prøve
     </button>
+    
   </div>
 </div>
 
@@ -1479,6 +1479,27 @@ if (!window.IS_PAYING) {
   })();
 </script>
 
+<script>
+  document.getElementById("start-checkout")?.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/create-checkout-session/", {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await res.json();
+      if (!data.url) throw new Error("No checkout URL");
+
+      window.location.href = data.url;
+    } catch (err) {
+      alert("Noe gikk galt. Prøv igjen.");
+      console.error(err);
+    }
+  });
+</script>
 
 
 {% if messages %}

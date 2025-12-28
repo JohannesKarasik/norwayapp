@@ -861,3 +861,74 @@ def logout_view(request):
     if request.method == "POST":
         logout(request)
     return redirect("/")
+
+import stripe
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+
+@require_POST
+@login_required
+def create_checkout_session(request):
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            customer_email=request.user.email,
+            line_items=[{
+                "price": settings.STRIPE_PRICE_ID,
+                "quantity": 1,
+            }],
+            subscription_data={
+                "trial_period_days": 30,
+            },
+            success_url=request.build_absolute_uri(
+                "/betaling/vellykket/?session_id={CHECKOUT_SESSION_ID}"
+            ),
+            cancel_url=request.build_absolute_uri("/"),
+            metadata={
+                "user_id": request.user.id,
+            },
+        )
+
+        return JsonResponse({"url": session.url})
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    
+
+import json
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+from django.conf import settings
+import stripe
+
+@csrf_exempt
+def stripe_webhook(request):
+    payload = request.body
+    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload,
+            sig_header,
+            settings.STRIPE_WEBHOOK_SECRET
+        )
+    except Exception:
+        return HttpResponse(status=400)
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        user_id = session["metadata"].get("user_id")
+
+        if user_id:
+            from django.contrib.auth.models import User
+            user = User.objects.get(id=user_id)
+            user.profile.is_paying = True
+            user.profile.save()
+
+    return HttpResponse(status=200)
+
