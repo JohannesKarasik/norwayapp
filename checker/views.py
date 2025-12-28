@@ -928,14 +928,6 @@ from .models import Profile
 
 @csrf_exempt
 def stripe_webhook(request):
-    import stripe
-    from django.conf import settings
-    from django.http import HttpResponse
-    from django.contrib.auth.models import User
-    from .models import Profile
-
-    stripe.api_key = settings.STRIPE_SECRET_KEY
-
     payload = request.body
     sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
 
@@ -945,20 +937,23 @@ def stripe_webhook(request):
             sig_header,
             settings.STRIPE_WEBHOOK_SECRET,
         )
-    except Exception as e:
+    except Exception:
         return HttpResponse(status=400)
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
 
         user_id = session.get("client_reference_id")
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                profile, _ = Profile.objects.get_or_create(user=user)
-                profile.is_paying = True
-                profile.save()
-            except User.DoesNotExist:
-                pass
+        if not user_id:
+            return HttpResponse(status=200)
+
+        try:
+            user = User.objects.get(id=user_id)
+            profile, _ = Profile.objects.get_or_create(user=user)
+            profile.is_paying = True
+            profile.stripe_customer_id = session.get("customer")
+            profile.save()
+        except User.DoesNotExist:
+            pass
 
     return HttpResponse(status=200)
