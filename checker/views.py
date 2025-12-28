@@ -262,8 +262,13 @@ def correct_with_openai_chunked(text: str, max_chars: int = 1800) -> str:
 
 
 from django.http import JsonResponse
+from django.http import JsonResponse
+from django.shortcuts import render
 
 def index(request):
+    # =========================
+    # AJAX TEXT CORRECTION
+    # =========================
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
         if not request.user.is_authenticated:
             return JsonResponse({"error": "auth_required"}, status=401)
@@ -271,7 +276,6 @@ def index(request):
         profile = getattr(request.user, "profile", None)
         if not profile or not profile.is_paying:
             return JsonResponse({"error": "payment_required"}, status=402)
-
 
         text = normalize_pasted_text(request.POST.get("text", ""))
 
@@ -309,8 +313,22 @@ def index(request):
             "error_count": len(differences),
         })
 
-    return render(request, "checker/index.html")
+    # =========================
+    # PAGE RENDER (IMPORTANT)
+    # =========================
+    is_paying = (
+        request.user.is_authenticated
+        and hasattr(request.user, "profile")
+        and request.user.profile.is_paying
+    )
 
+    return render(
+        request,
+        "checker/index.html",
+        {
+            "is_paying": is_paying,
+        }
+    )
 
 
 def same_words_exact(a: str, b: str) -> bool:
