@@ -253,6 +253,27 @@
 </div>
 
 
+<!-- PAYMENT MODAL -->
+<div class="modal" id="payment-modal" aria-hidden="true">
+  <div class="modal__overlay"></div>
+  <div class="modal__content" role="dialog" aria-modal="true">
+
+    <button class="modal__close" id="payment-close">×</button>
+
+    <h2 class="subheading">Oppgrader for å rette tekst</h2>
+    <p class="sub">
+      Du må ha et aktivt abonnement for å bruke Rettskriving Sjekk.
+    </p>
+
+    <a href="/subscribe/" class="btn btn--primary" style="width:100%">
+      Oppgrader nå
+    </a>
+
+  </div>
+</div>
+
+
+
 
 
 <style>
@@ -613,7 +634,9 @@
 
 <script>
   window.IS_AUTHENTICATED = {% if request.user.is_authenticated %}true{% else %}false{% endif %};
+  window.IS_PAYING = {% if request.user.is_authenticated and request.user.profile.is_paying %}true{% else %}false{% endif %};
 </script>
+
 
  <script>
   (function () {
@@ -903,10 +926,18 @@ document.addEventListener("click", (e) => {
   e.preventDefault();
 
   // 🔒 Require login before using the tool
-  if (!window.IS_AUTHENTICATED) {
-    if (window.openRegisterModal) window.openRegisterModal();
-    return;
-  }
+// 🔒 Require login
+if (!window.IS_AUTHENTICATED) {
+  window.openRegisterModal();
+  return;
+}
+
+// 💳 Require payment
+if (!window.IS_PAYING) {
+  window.openPaymentModal();
+  return;
+}
+
 
   const text = lastPlainText.trim();
   if (!text) return;
@@ -949,6 +980,14 @@ document.addEventListener("click", (e) => {
         }
         return;
       }
+
+      if (res.status === 402) {
+      submit.disabled = false;
+      submit.classList.remove("is-loading");
+      window.openPaymentModal();
+      return;
+    }
+
   
       const data = await res.json();
       const diffs = getWordDiffs(
@@ -1284,6 +1323,28 @@ document.addEventListener("click", (e) => {
       window.openAuthModal();
     }
   });
+</script>
+
+
+<script>
+  const paymentModal = document.getElementById("payment-modal");
+const paymentClose = document.getElementById("payment-close");
+
+function openPaymentModal(){
+  paymentModal.classList.add("active");
+  paymentModal.setAttribute("aria-hidden", "false");
+}
+
+function closePaymentModal(){
+  paymentModal.classList.remove("active");
+  paymentModal.setAttribute("aria-hidden", "true");
+}
+
+paymentClose?.addEventListener("click", closePaymentModal);
+paymentModal?.querySelector(".modal__overlay")?.addEventListener("click", closePaymentModal);
+
+window.openPaymentModal = openPaymentModal;
+
 </script>
 {% endif %}
 
