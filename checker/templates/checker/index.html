@@ -27,6 +27,12 @@
  <link rel="stylesheet" href="{% static 'checker/main.css' %}">
 </head>
 <body>
+  <script>
+    window.IS_AUTHENTICATED = {{ request.user.is_authenticated|yesno:"true,false" }};
+    window.IS_PAYING = {{ is_paying|yesno:"true,false" }};
+    console.log("IS_PAYING (server) =", window.IS_PAYING);
+  </script>
+  
  {% include "checker/header.html" %}
 
 
@@ -768,11 +774,6 @@
  </style>
 
 
-<script>
-  window.IS_AUTHENTICATED = {{ request.user.is_authenticated|yesno:"true,false" }};
-  window.IS_PAYING = {{ is_paying|yesno:"true,false" }};
-  console.log("IS_PAYING (server) =", window.IS_PAYING);
-</script>
 
 
  <script>
