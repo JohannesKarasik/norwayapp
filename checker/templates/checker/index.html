@@ -642,6 +642,43 @@
 }
 
 
+/* =========================
+   PAYMENT MODAL VISIBILITY
+   ========================= */
+
+   .pay-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;               /* 🔑 higher than header + other modals */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide ONLY when [hidden] */
+.pay-modal[hidden] {
+  display: none !important;
+}
+
+.pay-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+}
+
+.pay-modal__content {
+  position: relative;
+  background: #fff;
+  border-radius: 18px;
+  max-width: 640px;
+  width: 100%;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0,0,0,.25);
+}
+
+
+
  </style>
 
 <script>
