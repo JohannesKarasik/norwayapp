@@ -885,9 +885,9 @@ def create_checkout_session(request):
             subscription_data={
                 "trial_period_days": 30,
             },
-            success_url=request.build_absolute_uri(
-                "/betaling/vellykket/?session_id={CHECKOUT_SESSION_ID}"
-            ),
+            success_url = request.build_absolute_uri(
+                    "/?checkout=success"
+                )
             cancel_url=request.build_absolute_uri("/"),
             metadata={
                 "user_id": request.user.id,
