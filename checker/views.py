@@ -887,7 +887,7 @@ def create_checkout_session(request):
             },
             success_url = request.build_absolute_uri(
                     "/?checkout=success"
-                )
+                ),
             cancel_url=request.build_absolute_uri("/"),
             metadata={
                 "user_id": request.user.id,
