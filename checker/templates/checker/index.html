@@ -923,13 +923,7 @@
 /* -------------------------------
    TOOLTIP PORTAL (REUSE EXISTING)
 --------------------------------*/
-const tooltip = document.querySelector(".tooltip-portal");
 
-if (!tooltip) {
-  console.error("❌ tooltip-portal not found — it must be created in index.html");
-} else {
-  console.log("✅ Reusing existing tooltip:", tooltip);
-}
 
 window.__tcTooltip = tooltip;
 
