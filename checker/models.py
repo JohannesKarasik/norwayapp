@@ -9,8 +9,12 @@ class Profile(models.Model):
     is_paying = models.BooleanField(default=False)
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
 
+    # ✅ ADD THIS LINE
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, null=True)
+
     def __str__(self) -> str:
         return f"Profile({self.user.username})"
+
 
 
 @receiver(post_save, sender=User)
