@@ -68,41 +68,9 @@
           </section>
 
           <!-- Endre passord -->
-          <section class="settings-section">
-            <h3>Endre passord</h3>
 
-            <form method="post">
-              {% csrf_token %}
 
-              <input
-                type="password"
-                name="current_password"
-                placeholder="Nåværende passord"
-                required
-              >
 
-              <input
-                type="password"
-                name="new_password"
-                placeholder="Nytt passord"
-                required
-              >
-
-              <button type="submit" class="btn btn--primary">
-                Oppdater passord
-              </button>
-            </form>
-          </section>
-
-          <!-- Logg ut -->
-          <section class="settings-section">
-            <form method="post" action="{% url 'logout' %}">
-              {% csrf_token %}
-              <button class="btn btn--secondary">
-                Logg ut
-              </button>
-            </form>
-          </section>
 
         </div>
 
