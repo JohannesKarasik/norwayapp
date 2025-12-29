@@ -1,4 +1,4 @@
-{% extends "checker/base.html" %}
+
 
 {% block content %}
 <div class="settings">
@@ -58,7 +58,34 @@
       </button>
     </form>
   </section>
-
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-header__brand" href="{% url 'index' %}">
+        <span class="site-header__logo">✓</span>
+        <span class="site-header__name">Rettskriving Sjekk</span>
+      </a>
+  
+      <nav class="site-header__nav">
+        <a class="site-header__link" href="{% url 'index' %}">Korrektur</a>
+        <a class="site-header__link" href="/settings/">Innstillinger</a>
+      </nav>
+  
+      <div class="site-header__actions">
+        {% if request.user.is_authenticated %}
+          <span class="site-header__user">Hei, {{ request.user.first_name|default:request.user.username }}</span>
+  
+          <form method="POST" action="{% url 'logout' %}" class="site-header__logout">
+            {% csrf_token %}
+            <button type="submit" class="site-header__btn site-header__btn--ghost">Logg ut</button>
+          </form>
+        {% else %}
+          <a class="site-header__btn site-header__btn--ghost" href="#" data-open="login">Logg inn</a>
+          <a class="site-header__btn site-header__btn--primary" href="#" data-open="register">Opprett konto</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+  
 </div>
 
 <style>
@@ -77,6 +104,117 @@
 
 .status--warn {
   color: #b45309;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #fff;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.site-header__inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.site-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 700;
+}
+
+.site-header__logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.06);
+  font-size: 14px;
+}
+
+.site-header__name {
+  font-size: 14px;
+}
+
+.site-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 8px;
+}
+
+.site-header__link {
+  text-decoration: none;
+  color: rgba(0,0,0,0.72);
+  font-size: 14px;
+}
+
+.site-header__link:hover {
+  color: rgba(0,0,0,0.92);
+}
+
+.site-header__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-header__user {
+  font-size: 14px;
+  color: rgba(0,0,0,0.72);
+}
+
+.site-header__logout {
+  margin: 0;
+}
+
+.site-header__btn {
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  color: rgba(0,0,0,0.86);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-header__btn--ghost:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.site-header__btn--primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.site-header__btn--primary:hover {
+  opacity: 0.92;
+}
+
+@media (max-width: 720px) {
+  .site-header__nav {
+    display: none;
+  }
+  .site-header__name {
+    display: none;
+  }
 }
 
 </style>
