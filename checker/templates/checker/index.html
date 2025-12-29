@@ -1014,8 +1014,12 @@ document.addEventListener("click", (e) => {
   sessionStorage.setItem("tc_text", lastPlainText);
   updateCounts(lastPlainText);
 
-  document.querySelector(".tooltip-portal")?.classList.remove("visible");
+  tooltip.classList.remove("visible");
+  tooltip.style.display = "none";
+  tooltip.style.visibility = "hidden";
+  tooltip.innerHTML = "";
   activeError = null;
+
 }, true);
 
   
