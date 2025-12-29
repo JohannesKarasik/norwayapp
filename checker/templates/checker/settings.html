@@ -1,221 +1,114 @@
+{% load static %}
 
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-{% block content %}
-<div class="settings">
+  <title>Innstillinger – Rettskriving Sjekk</title>
+  <meta name="description" content="Administrer konto, abonnement og passord for Rettskriving Sjekk." />
 
-  <h1>Innstillinger</h1>
+  <link rel="icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'checker/favicon_io/favicon-32x32.png' %}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'checker/favicon_io/favicon-16x16.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'checker/favicon_io/apple-touch-icon.png' %}">
+  <link rel="shortcut icon" href="{% static 'checker/favicon_io/favicon.ico' %}">
+  <link rel="manifest" href="{% static 'checker/favicon_io/site.webmanifest' %}">
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="auth-error {{ message.tags }}">
-        {{ message }}
+  <link rel="stylesheet" href="{% static 'checker/main.css' %}">
+</head>
+
+<body>
+
+  {% include "checker/header.html" %}
+
+  <div class="wrap">
+    <main class="card">
+
+      <div class="card__body">
+        <div class="settings">
+          <h1>Innstillinger</h1>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="auth-error {{ message.tags }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <section class="settings-block">
+            <h3>Konto</h3>
+            <p><strong>E-post:</strong> {{ email }}</p>
+
+            {% if is_paying %}
+              <p class="status status--ok">Abonnement aktivt</p>
+            {% else %}
+              <p class="status status--warn">Ingen aktivt abonnement</p>
+            {% endif %}
+          </section>
+
+          <section class="settings-block">
+            <h3>Endre passord</h3>
+
+            <form method="post">
+              {% csrf_token %}
+
+              <input
+                type="password"
+                name="current_password"
+                placeholder="Nåværende passord"
+                required
+              >
+
+              <input
+                type="password"
+                name="new_password"
+                placeholder="Nytt passord"
+                required
+              >
+
+              <button type="submit" class="btn btn--primary">
+                Oppdater passord
+              </button>
+            </form>
+          </section>
+
+          <section class="settings-block">
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="btn btn--secondary">
+                Logg ut
+              </button>
+            </form>
+          </section>
+        </div>
       </div>
-    {% endfor %}
-  {% endif %}
 
-  <section class="settings-block">
-    <h3>Konto</h3>
-    <p><strong>E-post:</strong> {{ email }}</p>
+    </main>
+  </div>
 
-    {% if is_paying %}
-      <p class="status status--ok">Abonnement aktivt</p>
-    {% else %}
-      <p class="status status--warn">Ingen aktivt abonnement</p>
-    {% endif %}
-  </section>
+  {% include "checker/footer.html" %}
 
-  <section class="settings-block">
-    <h3>Endre passord</h3>
-
-    <form method="post">
-      {% csrf_token %}
-
-      <input
-        type="password"
-        name="current_password"
-        placeholder="Nåværende passord"
-        required
-      >
-
-      <input
-        type="password"
-        name="new_password"
-        placeholder="Nytt passord"
-        required
-      >
-
-      <button type="submit" class="btn btn--primary">
-        Oppdater passord
-      </button>
-    </form>
-  </section>
-
-  <section class="settings-block">
-    <form method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <button class="btn btn--secondary">
-        Logg ut
-      </button>
-    </form>
-  </section>
-  <header class="site-header">
-    <div class="site-header__inner">
-      <a class="site-header__brand" href="{% url 'index' %}">
-        <span class="site-header__logo">✓</span>
-        <span class="site-header__name">Rettskriving Sjekk</span>
-      </a>
-  
-      <nav class="site-header__nav">
-        <a class="site-header__link" href="{% url 'index' %}">Korrektur</a>
-        <a class="site-header__link" href="/settings/">Innstillinger</a>
-      </nav>
-  
-      <div class="site-header__actions">
-        {% if request.user.is_authenticated %}
-          <span class="site-header__user">Hei, {{ request.user.first_name|default:request.user.username }}</span>
-  
-          <form method="POST" action="{% url 'logout' %}" class="site-header__logout">
-            {% csrf_token %}
-            <button type="submit" class="site-header__btn site-header__btn--ghost">Logg ut</button>
-          </form>
-        {% else %}
-          <a class="site-header__btn site-header__btn--ghost" href="#" data-open="login">Logg inn</a>
-          <a class="site-header__btn site-header__btn--primary" href="#" data-open="register">Opprett konto</a>
-        {% endif %}
-      </div>
-    </div>
-  </header>
-  
-</div>
-
-<style>
+  <style>
     .settings {
-  max-width: 520px;
-  margin: 40px auto;
-}
+      max-width: 520px;
+      margin: 40px auto;
+    }
 
-.settings-block {
-  margin-top: 32px;
-}
+    .settings-block {
+      margin-top: 32px;
+    }
 
-.status--ok {
-  color: #0a7c2f;
-}
+    .status--ok {
+      color: #0a7c2f;
+    }
 
-.status--warn {
-  color: #b45309;
-}
+    .status--warn {
+      color: #b45309;
+    }
+  </style>
 
-.site-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: #fff;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-}
-
-.site-header__inner {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.site-header__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-decoration: none;
-  color: inherit;
-  font-weight: 700;
-}
-
-.site-header__logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.06);
-  font-size: 14px;
-}
-
-.site-header__name {
-  font-size: 14px;
-}
-
-.site-header__nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: 8px;
-}
-
-.site-header__link {
-  text-decoration: none;
-  color: rgba(0,0,0,0.72);
-  font-size: 14px;
-}
-
-.site-header__link:hover {
-  color: rgba(0,0,0,0.92);
-}
-
-.site-header__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.site-header__user {
-  font-size: 14px;
-  color: rgba(0,0,0,0.72);
-}
-
-.site-header__logout {
-  margin: 0;
-}
-
-.site-header__btn {
-  border: 1px solid rgba(0,0,0,0.12);
-  background: #fff;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-  text-decoration: none;
-  color: rgba(0,0,0,0.86);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.site-header__btn--ghost:hover {
-  background: rgba(0,0,0,0.04);
-}
-
-.site-header__btn--primary {
-  background: #111;
-  color: #fff;
-  border-color: #111;
-}
-
-.site-header__btn--primary:hover {
-  opacity: 0.92;
-}
-
-@media (max-width: 720px) {
-  .site-header__nav {
-    display: none;
-  }
-  .site-header__name {
-    display: none;
-  }
-}
-
-</style>
-{% endblock %}
+</body>
+</html>
