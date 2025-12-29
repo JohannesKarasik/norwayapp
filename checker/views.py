@@ -977,3 +977,41 @@ def stripe_webhook(request):
             pass
 
     return HttpResponse(status=200)
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+
+@login_required
+def settings_view(request):
+    user = request.user
+    profile = getattr(user, "profile", None)
+
+    if request.method == "POST":
+        # Change password
+        current = request.POST.get("current_password")
+        new = request.POST.get("new_password")
+
+        if not user.check_password(current):
+            messages.error(request, "Nåværende passord er feil.")
+            return redirect("settings")
+
+        if not new or len(new) < 8:
+            messages.error(request, "Passordet må være minst 8 tegn.")
+            return redirect("settings")
+
+        user.set_password(new)
+        user.save()
+
+        messages.success(request, "Passordet er oppdatert.")
+        return redirect("settings")
+
+    return render(
+        request,
+        "checker/settings.html",
+        {
+            "email": user.email,
+            "is_paying": bool(profile and profile.is_paying),
+        }
+    )

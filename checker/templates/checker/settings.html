@@ -1,0 +1,83 @@
+{% extends "checker/base.html" %}
+
+{% block content %}
+<div class="settings">
+
+  <h1>Innstillinger</h1>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="auth-error {{ message.tags }}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <section class="settings-block">
+    <h3>Konto</h3>
+    <p><strong>E-post:</strong> {{ email }}</p>
+
+    {% if is_paying %}
+      <p class="status status--ok">Abonnement aktivt</p>
+    {% else %}
+      <p class="status status--warn">Ingen aktivt abonnement</p>
+    {% endif %}
+  </section>
+
+  <section class="settings-block">
+    <h3>Endre passord</h3>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <input
+        type="password"
+        name="current_password"
+        placeholder="Nåværende passord"
+        required
+      >
+
+      <input
+        type="password"
+        name="new_password"
+        placeholder="Nytt passord"
+        required
+      >
+
+      <button type="submit" class="btn btn--primary">
+        Oppdater passord
+      </button>
+    </form>
+  </section>
+
+  <section class="settings-block">
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="btn btn--secondary">
+        Logg ut
+      </button>
+    </form>
+  </section>
+
+</div>
+
+<style>
+    .settings {
+  max-width: 520px;
+  margin: 40px auto;
+}
+
+.settings-block {
+  margin-top: 32px;
+}
+
+.status--ok {
+  color: #0a7c2f;
+}
+
+.status--warn {
+  color: #b45309;
+}
+
+</style>
+{% endblock %}
