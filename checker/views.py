@@ -414,7 +414,7 @@ def insert_commas_with_openai(text: str) -> str:
             ],
             temperature=0,
         )
-        out = (resp.output_text or "").rstrip(" \t")
+        out = (resp.choices[0].message.content or "").rstrip(" \t")
 
         if not out:
             return text
@@ -479,7 +479,7 @@ def correct_with_openai(text: str) -> str:
                 ],
                 temperature=0,
             )
-            return (resp.output_text or "").rstrip(" \t")
+            return (resp.choices[0].message.content or "").rstrip(" \t")
 
 
         # 1) First attempt
