@@ -405,8 +405,8 @@ def insert_commas_with_openai(text: str) -> str:
             "Returner KUN teksten."
         )
 
-        resp = client = get_openai_client()
-        client.chat.completions.create(
+        client = get_openai_client()
+        resp = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -414,7 +414,8 @@ def insert_commas_with_openai(text: str) -> str:
             ],
             temperature=0,
         )
-        out = (resp.choices[0].message.content or "").rstrip(" \t")
+        out = (resp.output_text or "").rstrip(" \t")
+
         if not out:
             return text
 
@@ -469,8 +470,8 @@ def correct_with_openai(text: str) -> str:
 
 
         def call_llm(system_prompt: str, user_text: str) -> str:
-            resp = client = get_openai_client()
-            client.chat.completions.create(
+            client = get_openai_client()
+            resp = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -478,7 +479,8 @@ def correct_with_openai(text: str) -> str:
                 ],
                 temperature=0,
             )
-            return (resp.choices[0].message.content or "").rstrip(" \t")
+            return (resp.output_text or "").rstrip(" \t")
+
 
         # 1) First attempt
         corrected = call_llm(base_prompt, text)
