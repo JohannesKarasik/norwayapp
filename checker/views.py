@@ -972,11 +972,39 @@ def stripe_webhook(request):
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.is_paying = True
             profile.stripe_customer_id = session.get("customer")
+            profile.stripe_subscription_id = session.get("subscription")
+            profile.save()
+
             profile.save()
         except User.DoesNotExist:
             pass
 
     return HttpResponse(status=200)
+
+
+
+@login_required
+def cancel_subscription(request):
+    profile = getattr(request.user, "profile", None)
+
+    if not profile or not profile.stripe_subscription_id:
+        messages.error(request, "Fant ikke aktivt abonnement.")
+        return redirect("settings")
+
+    try:
+        stripe.checkout.Session.expire  # noop import guard
+
+        stripe.Subscription.delete(profile.stripe_subscription_id)
+
+        profile.is_paying = False
+        profile.stripe_subscription_id = None
+        profile.save()
+
+        messages.success(request, "Abonnementet er avsluttet.")
+    except Exception as e:
+        messages.error(request, "Kunne ikke avslutte abonnementet.")
+
+    return redirect("settings")
 
 
 
@@ -1015,3 +1043,5 @@ def settings_view(request):
             "is_paying": bool(profile and profile.is_paying),
         }
     )
+
+

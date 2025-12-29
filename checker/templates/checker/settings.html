@@ -52,7 +52,7 @@
             {% if is_paying %}
               <p class="status status--ok">Aktivt abonnement</p>
 
-              <form method="post" action="{% url 'checkout' %}">
+              <form method="post" action="{% url 'cancel_subscription' %}">
                 {% csrf_token %}
                 <button
                   type="submit"
@@ -62,6 +62,7 @@
                   Si opp abonnement
                 </button>
               </form>
+              
             {% else %}
               <p class="status status--warn">Ingen aktivt abonnement</p>
             {% endif %}
