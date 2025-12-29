@@ -12,7 +12,7 @@
 
     <div class="header-actions">
       {% if user.is_authenticated %}
-        <a class="header-link" action="{% url 'settings' %}" >Innstillinger</a>
+        <a class="header-link" href="{% url 'settings' %}">Innstillinger</a>
 
         <form method="post" action="{% url 'logout' %}" style="margin:0;">
           {% csrf_token %}
