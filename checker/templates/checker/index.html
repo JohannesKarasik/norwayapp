@@ -793,6 +793,35 @@
 }
 }
 
+/* ✅ Stop horizontal scroll on mobile */
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Safer on iOS/Chrome where weird elements cause wiggle */
+@media (max-width: 640px) {
+  body {
+    position: relative;
+  }
+
+  /* Clamp anything that might exceed the viewport */
+  img, svg, video, canvas {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* If your editor or card can overflow due to long unbroken text */
+  .card, .card__body, .editor, .seo {
+    max-width: 100%;
+  }
+
+  /* Long words/URLs won’t force width */
+  .seo, .card__body, p, li, blockquote {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
 
 
  </style>
