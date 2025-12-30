@@ -19,10 +19,7 @@
           Kontakt
         </button>
 
-        <form method="post" action="{% url 'logout' %}" style="margin:0;">
-          {% csrf_token %}
-          <button type="submit" class="header-link header-link--button">Logg ut</button>
-        </form>
+
       {% else %}
         <!-- ✅ CONTACT LINK (opens modal) -->
         <button type="button" class="header-link header-link--button" onclick="openContactModal()">

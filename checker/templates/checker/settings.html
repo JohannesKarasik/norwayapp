@@ -62,16 +62,22 @@
                   Si opp abonnement
                 </button>
               </form>
-              
             {% else %}
               <p class="status status--warn">Ingen aktivt abonnement</p>
             {% endif %}
           </section>
 
-          <!-- Endre passord -->
+          <!-- Logg ut -->
+          <section class="settings-section">
+            <h3>Økt</h3>
 
-
-
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn--outline">
+                Logg ut
+              </button>
+            </form>
+          </section>
 
         </div>
 
