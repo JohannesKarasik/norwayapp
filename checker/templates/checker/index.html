@@ -770,13 +770,29 @@
   .pay-modal__cta { transition: none; }
 }
 
-/* Remove side padding on mobile */
+/* ===== FULL-WIDTH MAIN ON MOBILE ===== */
 @media (max-width: 640px) {
-  .wrap {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
+
+/* Remove outer gutters */
+.wrap {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
+
+/* Remove card spacing */
+.card {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* THIS fixes the remaining padding */
+.card__body {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+}
+
 
 
  </style>
