@@ -144,7 +144,7 @@
 
   /* ✅ MOBILE BEHAVIOR:
      - Logged in: show ONLY "Innstillinger"
-     - Logged out: show NOTHING
+     - Logged out: show NOTHING AND center the logo
   */
   @media (max-width: 640px) {
     /* Hide everything in the actions area by default */
@@ -157,6 +157,16 @@
     .header-actions .header-link--settings {
       display: inline-flex !important;
       align-items: center;
+    }
+
+    /* Center the logo when logged out (no actions visible) */
+    body:not(.is-auth) .site-header .wrap--header{
+      justify-content: center !important;
+    }
+
+    /* Ensure logo doesn't shift the layout */
+    .site-header .logo{
+      margin: 0 auto !important;
     }
   }
 
