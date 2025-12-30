@@ -14,11 +14,21 @@
       {% if user.is_authenticated %}
         <a class="header-link" href="{% url 'settings' %}">Innstillinger</a>
 
+        <!-- ✅ CONTACT LINK (opens modal) -->
+        <button type="button" class="header-link header-link--button" onclick="openContactModal()">
+          Kontakt
+        </button>
+
         <form method="post" action="{% url 'logout' %}" style="margin:0;">
           {% csrf_token %}
           <button type="submit" class="header-link header-link--button">Logg ut</button>
         </form>
       {% else %}
+        <!-- ✅ CONTACT LINK (opens modal) -->
+        <button type="button" class="header-link header-link--button" onclick="openContactModal()">
+          Kontakt
+        </button>
+
         <button type="button" class="header-link header-link--button" onclick="window.openAuthModal?.()">
           Logg inn
         </button>
@@ -31,6 +41,43 @@
 
   <hr style="border:0;border-top:1px solid var(--border); margin:0;">
 </header>
+
+<!-- ✅ SIMPLE CONTACT MODAL -->
+<div id="contact-modal" class="contact-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="contact-modal__backdrop" onclick="closeContactModal()"></div>
+
+  <div class="contact-modal__card" role="document">
+    <button type="button" class="contact-modal__close" aria-label="Lukk" onclick="closeContactModal()">×</button>
+
+    <h3 class="contact-modal__title">Kontakt</h3>
+    <p class="contact-modal__text">
+      Send oss en e-post på:
+      <a class="contact-modal__email" href="mailto:support@rettskrivingsjekk.com">support@rettskrivingsjekk.com</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  function openContactModal() {
+    const modal = document.getElementById("contact-modal");
+    if (!modal) return;
+    modal.classList.add("is-open");
+    modal.setAttribute("aria-hidden", "false");
+    document.addEventListener("keydown", onContactModalKeydown);
+  }
+
+  function closeContactModal() {
+    const modal = document.getElementById("contact-modal");
+    if (!modal) return;
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", onContactModalKeydown);
+  }
+
+  function onContactModalKeydown(e) {
+    if (e.key === "Escape") closeContactModal();
+  }
+</script>
 
 <style>
   /* LOCK HEADER HEIGHT */
@@ -103,5 +150,68 @@
   main > .wrap,
   body > .wrap{
     margin-inline:auto;
+  }
+
+  /* =========================
+     ✅ CONTACT MODAL STYLES
+     ========================= */
+  .contact-modal{
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 9999;
+  }
+
+  .contact-modal.is-open{
+    display: block;
+  }
+
+  .contact-modal__backdrop{
+    position:absolute;
+    inset:0;
+    background: rgba(0,0,0,0.45);
+  }
+
+  .contact-modal__card{
+    position: relative;
+    width: min(420px, calc(100% - 32px));
+    margin: 120px auto 0;
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+
+  .contact-modal__close{
+    position:absolute;
+    top: 8px;
+    right: 10px;
+    border: 0;
+    background: transparent;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .contact-modal__title{
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .contact-modal__text{
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .contact-modal__email{
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .contact-modal__email:hover{
+    text-decoration: underline;
   }
 </style>
