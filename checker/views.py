@@ -930,7 +930,8 @@ def create_checkout_session(request):
             success_url=request.build_absolute_uri("/"),
             cancel_url=request.build_absolute_uri("/"),
 
-            allow_promotion_codes=True,
+            # ✅ Promo/coupon box removed
+            allow_promotion_codes=False,
         )
 
         return JsonResponse({"url": session.url})
@@ -941,7 +942,6 @@ def create_checkout_session(request):
             status=400
         )
 
-# checker/views.py (same file)
 
 from django.contrib.auth.models import User
 from .models import Profile
