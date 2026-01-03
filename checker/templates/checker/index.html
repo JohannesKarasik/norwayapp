@@ -884,6 +884,12 @@ html, body {
   let lastPlainText = "";
   let activeError = null;
 
+  // 🔐 Free usage gating
+let appliedCorrections = Number(
+  sessionStorage.getItem("appliedCorrections") || 0
+);
+
+
   /* -------------------------------
      TEXT HELPERS
   --------------------------------*/
@@ -993,6 +999,23 @@ window.__tcTooltip = tooltip;
     if (!error) return;
   
     activeError = error;
+
+      // 🚦 GATING LOGIC (after 1 free correction)
+  if (appliedCorrections >= 1) {
+
+  // Not logged in → register
+  if (!window.IS_AUTHENTICATED) {
+    window.openRegisterModal();
+    return;
+  }
+
+  // Logged in but not paying → payment
+  if (!window.IS_PAYING) {
+    window.openPaymentModal();
+    return;
+  }
+  }
+
     console.log("❗ Active error set:", activeError, {
       original: error.dataset.original,
       suggestion: error.dataset.suggestion
@@ -1055,9 +1078,17 @@ document.addEventListener("click", (e) => {
   if (!activeError) return;
 
   if (applyBtn) {
-    const suggestion = activeError.dataset.suggestion || "";
-    activeError.replaceWith(document.createTextNode(suggestion));
-  } else {
+  const suggestion = activeError.dataset.suggestion || "";
+  activeError.replaceWith(document.createTextNode(suggestion));
+
+  // ✅ Count only applied corrections
+  appliedCorrections += 1;
+  sessionStorage.setItem(
+    "appliedCorrections",
+    appliedCorrections.toString()
+  );
+}
+ else {
     const original = activeError.dataset.original || "";
     activeError.replaceWith(document.createTextNode(original));
   }
@@ -1099,7 +1130,11 @@ document.addEventListener("click", (e) => {
     lastPlainText = getPlainText();
     sessionStorage.setItem("tc_text", lastPlainText);
     updateCounts(lastPlainText);
-  
+    // ✏️ Editing text resets free usage
+  appliedCorrections = 0;
+  sessionStorage.setItem("appliedCorrections", "0");
+
+    
     enforceLengthLimit(lastPlainText);
   });
   
@@ -1122,16 +1157,7 @@ document.addEventListener("click", (e) => {
 
   // 🔒 Require login before using the tool
 // 🔒 Require login
-if (!window.IS_AUTHENTICATED) {
-  window.openRegisterModal();
-  return;
-}
 
-// 💳 Require payment
-if (!window.IS_PAYING) {
-  window.openPaymentModal();
-  return;
-}
 
 
   const text = lastPlainText.trim();
@@ -1191,6 +1217,11 @@ if (!window.IS_PAYING) {
       lastPlainText = data.original_text;
       sessionStorage.setItem("tc_text", lastPlainText);
       updateCounts(lastPlainText);
+
+      // 🔁 Reset free correction counter on new result
+      appliedCorrections = 0;
+      sessionStorage.setItem("appliedCorrections", "0");
+
   
     } catch (err) {
       console.error("Submit error:", err);
