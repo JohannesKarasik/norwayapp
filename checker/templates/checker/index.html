@@ -1189,18 +1189,7 @@ document.addEventListener("click", (e) => {
         body: new URLSearchParams({ text }),
       });
   
-      // 🔐 NOT LOGGED IN
-      if (res.status === 401) {
-        submit.disabled = false;
-        submit.classList.remove("is-loading");
-  
-        if (window.openRegisterModal) {
-          window.openRegisterModal();
-        } else if (window.openAuthModal) {
-          window.openAuthModal();
-        }
-        return;
-      }
+
 
   
       const data = await res.json();

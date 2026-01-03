@@ -270,13 +270,7 @@ def index(request):
     # AJAX TEXT CORRECTION
     # =========================
     if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        if not request.user.is_authenticated:
-            return JsonResponse({"error": "auth_required"}, status=401)
-
-        profile = getattr(request.user, "profile", None)
-        if not profile or not profile.is_paying:
-            return JsonResponse({"error": "payment_required"}, status=402)
-
+       
         text = normalize_pasted_text(request.POST.get("text", ""))
 
         if not text.strip():
