@@ -144,7 +144,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # STRIPE CONFIGURATION
 # =========================
 
-STRIPE_MODE = os.getenv("STRIPE_MODE", "live")
+STRIPE_MODE = os.getenv("STRIPE_MODE", "test")
 
 if STRIPE_MODE == "live":
     STRIPE_SECRET_KEY = os.getenv("STRIPE_LIVE_SECRET_KEY")
