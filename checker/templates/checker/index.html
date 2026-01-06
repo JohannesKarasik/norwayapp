@@ -44,53 +44,58 @@
       <div class="checker-layout">
 
         <!-- LEFT ROW 1: title/subtitle -->
-        <div class="checker-hero">
-          <header>
-            <h1>Rett teksten din med Rettskriving Sjekk</h1>
-            <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
-          </header>
-        </div>
+        <!-- LEFT COLUMN -->
+        <div class="checker-left">
 
-        <!-- LEFT ROW 2: editor/tool -->
-        <div class="checker-tool">
-          <form method="POST" id="form">
-            {% csrf_token %}
+          <div class="checker-hero">
+            <header>
+              <h1>Rett teksten din med Rettskriving Sjekk</h1>
+              <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
+            </header>
+          </div>
 
-            <div class="checker-main">
-              <div
-                id="text-editor"
-                class="editor"
-                contenteditable="true"
-                role="textbox"
-                aria-multiline="true"
-                spellcheck="false"
-                placeholder="Lim inn teksten din her..."></div>
+          <div class="checker-tool">
+            <form method="POST" id="form">
+              {% csrf_token %}
 
-              <p id="length-error" class="length-error" hidden>
-                Teksten er for lang. Du kan rette maks 800 ord om gangen.
-              </p>
+              <div class="checker-main">
+                <div
+                  id="text-editor"
+                  class="editor"
+                  contenteditable="true"
+                  role="textbox"
+                  aria-multiline="true"
+                  spellcheck="false"
+                  placeholder="Lim inn teksten din her..."></div>
 
-              <div class="meta" id="counter">
-                <div class="counter" aria-live="polite">
-                  <span id="words">0</span> ord
-                  <span>·</span>
-                  <span id="chars">0</span> tegn
+                <p id="length-error" class="length-error" hidden>
+                  Teksten er for lang. Du kan rette maks 800 ord om gangen.
+                </p>
+
+                <div class="meta" id="counter">
+                  <div class="counter" aria-live="polite">
+                    <span id="words">0</span> ord
+                    <span>·</span>
+                    <span id="chars">0</span> tegn
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button type="submit" id="submit" class="btn btn--primary">
+                    <span class="spinner" aria-hidden="true"></span>
+                    Rett tekst
+                  </button>
+                  <button type="button" class="btn btn--ghost" id="clear">Tøm</button>
                 </div>
               </div>
+            </form>
+          </div>
 
-              <div class="actions">
-                <button type="submit" id="submit" class="btn btn--primary">
-                  <span class="spinner" aria-hidden="true"></span>
-                  Rett tekst
-                </button>
-                <button type="button" class="btn btn--ghost" id="clear">Tøm</button>
-              </div>
-            </div>
-          </form>
         </div>
 
-        <!-- RIGHT: sidebar (starts at same top as H1) -->
+        <!-- RIGHT COLUMN -->
         <aside class="checker-sidebar" id="suggestions-panel" aria-label="Forslag">
+
           <div class="checker-sidebar__head">
             <div>
               <div class="checker-sidebar__title">Forslag</div>
@@ -1143,27 +1148,25 @@ html, body {
 .checker-layout{
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "hero sidebar"
-    "tool sidebar";
   gap: 18px;
   align-items: start;
 }
 
-/* Left column rows */
-.checker-hero{ grid-area: hero; }
-.checker-tool{ grid-area: tool; min-width: 0; }
+/* Left column stacks hero + tool */
+.checker-left{
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
 
 /* Keep existing behavior */
 .checker-main{
   min-width: 0;
 }
 
-/* Right column */
+/* Right column (make it scroll instead of stretching the grid) */
 .checker-sidebar{
-  grid-area: sidebar;
-
   position: sticky;
   top: 18px;
   align-self: start;
@@ -1173,7 +1176,26 @@ html, body {
   background: #fff;
   padding: 14px;
   min-height: 220px;
+
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+
+/* Responsive: stack sidebar under tool */
+@media (max-width: 980px){
+  .checker-layout{
+    grid-template-columns: 1fr;
+  }
+
+  .checker-sidebar{
+    position: relative;
+    top: 0;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
 
 /* Responsive: stack hero + tool + sidebar */
 @media (max-width: 980px){
