@@ -1442,6 +1442,57 @@ html, body {
     console.log("✅ main.js loaded");
     document.addEventListener("click", (e) => {
       // console.log("🌍 GLOBAL CLICK:", e.target);
+      // ✅ TOOLTIP CLOSE HANDLERS (CORRECT SCOPE)
+
+// Outside click
+document.addEventListener("mousedown", (e) => {
+  if (!tooltip?.classList.contains("visible")) return;
+
+  const onTooltip = e.target.closest(".tooltip-portal");
+  const onError = e.target.closest("#text-editor .error");
+
+  if (!onTooltip && !onError) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+}, true);
+
+// Close button
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".tooltip-portal .tc-tip__close")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
+// ESC key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
+// Scroll / resize
+window.addEventListener("scroll", () => {
+  if (tooltip?.classList.contains("visible")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+}, { passive: true });
+
+window.addEventListener("resize", () => {
+  if (tooltip?.classList.contains("visible")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
     });
   
     const MAX_WORDS = 800;
@@ -2316,34 +2367,7 @@ if (!window.IS_AUTHENTICATED) {
   })();
 
 
-  // ✅ Close tooltip on outside click / ESC / scroll / resize
-document.addEventListener("mousedown", (e) => {
-  if (!tooltip?.classList.contains("visible")) return;
 
-  const onTooltip = e.target.closest(".tooltip-portal");
-  const onError = e.target.closest("#text-editor .error");
-  if (!onTooltip && !onError) {
-    hideTooltip();
-    activeError = null;
-    clearActiveStates();
-  }
-}, true);
-
-document.addEventListener("click", (e) => {
-  if (e.target.closest(".tooltip-portal .tc-tip__close")) {
-    hideTooltip();
-    activeError = null;
-    clearActiveStates();
-  }
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    hideTooltip();
-    activeError = null;
-    clearActiveStates();
-  }
-});
 
 window.addEventListener("scroll", () => {
   if (tooltip?.classList.contains("visible")) {
@@ -2443,12 +2467,19 @@ window.addEventListener("resize", () => {
     const modal = document.getElementById("paymentModal");
 
     function openPaymentModal() {
-      if (!modal) {
-        console.error("❌ paymentModal not found");
-        return;
-      }
-      modal.hidden = false;
-    }
+  if (!modal) {
+    console.error("❌ paymentModal not found");
+    return;
+  }
+
+  // ✅ FORCE-CLOSE ANY OPEN TOOLTIP
+  window.__tcTooltip?.classList.remove("visible");
+  window.__tcTooltip && (window.__tcTooltip.style.display = "none");
+  window.__tcTooltip && (window.__tcTooltip.innerHTML = "");
+
+  modal.hidden = false;
+}
+
 
     function closePaymentModal() {
       if (!modal) return;
