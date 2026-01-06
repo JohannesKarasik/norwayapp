@@ -1851,22 +1851,16 @@ function pickBadge(original, suggestion, id) {
       item?.classList.add("is-active");
     }
   
-    function gateIfNeeded() {
-  if (appliedCorrections >= 1) {
-    // ✅ Save current highlights before redirect/login flow
+    function gateIfNeededForApply() {
+  // Allow exactly ONE free apply
+  if (appliedCorrections >= 1 && !window.IS_AUTHENTICATED) {
     persistHighlightedState();
-
-    if (!window.IS_AUTHENTICATED) {
-      window.openRegisterModal();
-      return false;
-    }
-    if (!window.IS_PAYING) {
-      window.openPaymentModal();
-      return false;
-    }
+    window.openRegisterModal();
+    return false;
   }
   return true;
 }
+
 
   
 function showTooltipForErrorSpan(errorSpan) {
@@ -1962,7 +1956,6 @@ function showTooltipForErrorSpan(errorSpan) {
   
       // Jump
       if (e.target.closest("[data-jump]")) {
-        if (!gateIfNeeded()) return;
   
         const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
         if (!span) {
@@ -1978,19 +1971,18 @@ function showTooltipForErrorSpan(errorSpan) {
         return;
       }
   
-      // Apply from sidebar
       if (e.target.closest("[data-apply]")) {
-        if (!gateIfNeeded()) return;
-        applyOrDismissById(errorId, "apply");
-        return;
-      }
+  if (!gateIfNeededForApply()) return;
+  applyOrDismissById(errorId, "apply");
+  return;
+}
+
   
-      // Dismiss from sidebar
-      if (e.target.closest("[data-dismiss]")) {
-        if (!gateIfNeeded()) return;
-        applyOrDismissById(errorId, "dismiss");
-        return;
-      }
+if (e.target.closest("[data-dismiss]")) {
+  applyOrDismissById(errorId, "dismiss");
+  return;
+}
+
     });
   
     function removeSidebarItemById(errorId) {
@@ -2054,11 +2046,13 @@ function showTooltipForErrorSpan(errorSpan) {
       const errorId = activeError.dataset.errorId || "";
   
       if (applyBtn) {
-        const suggestion = activeError.dataset.suggestion || "";
-        activeError.replaceWith(document.createTextNode(suggestion));
-  
-        appliedCorrections += 1;
-        sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
+  if (!gateIfNeededForApply()) return;
+
+  const suggestion = activeError.dataset.suggestion || "";
+  activeError.replaceWith(document.createTextNode(suggestion));
+
+  appliedCorrections += 1;
+  sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
       } else {
         const original = activeError.dataset.original || "";
         activeError.replaceWith(document.createTextNode(original));
