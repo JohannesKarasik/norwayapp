@@ -1319,6 +1319,115 @@ function showQualitySummaryForText(text) {
   
     let lastPlainText = "";
     let activeError = null;
+
+    // ===============================
+// ✅ Persist/restore highlighted state across login reload
+// ===============================
+const TC_STATE = {
+  editorHTML: "tc_editor_html",
+  sidebarHTML: "tc_sidebar_html",
+  sidebarCount: "tc_sidebar_count",
+  sidebarEmptyHidden: "tc_sidebar_empty_hidden",
+  sidebarEmptyHTML: "tc_sidebar_empty_html",
+  scrollY: "tc_scroll_y",
+  qualityHidden: "tc_quality_hidden",
+  qsSerious: "tc_qs_serious",
+  qsSmall: "tc_qs_small",
+  qsImprove: "tc_qs_improve",
+};
+
+function persistHighlightedState() {
+  try {
+    // Save current view (spans + remaining suggestions)
+    sessionStorage.setItem(TC_STATE.editorHTML, editor?.innerHTML || "");
+    sessionStorage.setItem(TC_STATE.sidebarHTML, suggestionsList?.innerHTML || "");
+    sessionStorage.setItem(TC_STATE.sidebarCount, suggestionsCount?.textContent || "0");
+
+    if (suggestionsEmpty) {
+      sessionStorage.setItem(TC_STATE.sidebarEmptyHidden, suggestionsEmpty.hidden ? "1" : "0");
+      sessionStorage.setItem(TC_STATE.sidebarEmptyHTML, suggestionsEmpty.innerHTML || "");
+    }
+
+    // Save quality summary (optional)
+    if (qualityWrap) {
+      sessionStorage.setItem(TC_STATE.qualityHidden, qualityWrap.hidden ? "1" : "0");
+      sessionStorage.setItem(TC_STATE.qsSerious, qsSerious?.textContent || "0");
+      sessionStorage.setItem(TC_STATE.qsSmall, qsSmall?.textContent || "0");
+      sessionStorage.setItem(TC_STATE.qsImprove, qsImprove?.textContent || "0");
+    }
+
+    // Also keep plaintext + scroll position
+    sessionStorage.setItem("tc_text", getPlainText());
+    sessionStorage.setItem(TC_STATE.scrollY, String(window.scrollY || 0));
+  } catch (e) {
+    // ignore storage issues
+  }
+}
+
+function clearHighlightedState() {
+  try {
+    Object.values(TC_STATE).forEach((k) => sessionStorage.removeItem(k));
+    // (we keep tc_text sometimes, but when user edits/clears we remove it below)
+  } catch (e) {}
+}
+
+function restoreHighlightedState() {
+  const savedEditorHTML = sessionStorage.getItem(TC_STATE.editorHTML);
+  const savedSidebarHTML = sessionStorage.getItem(TC_STATE.sidebarHTML);
+
+  // Must have editorHTML to restore "highlight mode"
+  if (!savedEditorHTML) return false;
+
+  // Restore editor + sidebar
+  editor.innerHTML = savedEditorHTML;
+  if (suggestionsList && savedSidebarHTML !== null) {
+    suggestionsList.innerHTML = savedSidebarHTML;
+  }
+
+  // Restore empty state
+  if (suggestionsEmpty) {
+    const hidden = sessionStorage.getItem(TC_STATE.sidebarEmptyHidden);
+    const emptyHTML = sessionStorage.getItem(TC_STATE.sidebarEmptyHTML);
+    if (hidden !== null) suggestionsEmpty.hidden = hidden === "1";
+    if (emptyHTML !== null && emptyHTML !== "") suggestionsEmpty.innerHTML = emptyHTML;
+  }
+
+  // Restore counts (or recompute)
+  if (suggestionsCount) {
+    const c = sessionStorage.getItem(TC_STATE.sidebarCount);
+    suggestionsCount.textContent = c || String(suggestionsList?.querySelectorAll(".s-item").length || 0);
+  }
+
+  // Restore quality summary
+  if (qualityWrap && qsSerious && qsSmall && qsImprove) {
+    const qHidden = sessionStorage.getItem(TC_STATE.qualityHidden);
+    if (qHidden !== null) qualityWrap.hidden = (qHidden === "1");
+    qsSerious.textContent = sessionStorage.getItem(TC_STATE.qsSerious) || "0";
+    qsSmall.textContent   = sessionStorage.getItem(TC_STATE.qsSmall) || "0";
+    qsImprove.textContent = sessionStorage.getItem(TC_STATE.qsImprove) || "0";
+  } else {
+    // fallback if not stored
+    showQualitySummaryForText(getPlainText());
+  }
+
+  // Re-sync text + counters
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
+  enforceLengthLimit(lastPlainText);
+
+  // Restore scroll (nice UX)
+  const y = Number(sessionStorage.getItem(TC_STATE.scrollY) || 0);
+  requestAnimationFrame(() => window.scrollTo(0, y));
+
+  // Make sure tooltip/active markers are reset
+  clearActiveStates();
+  hideTooltip();
+  activeError = null;
+
+  return true;
+}
+
   
     // 🔐 Free usage gating
     let appliedCorrections = Number(
@@ -1520,18 +1629,22 @@ function showQualitySummaryForText(text) {
     }
   
     function gateIfNeeded() {
-      if (appliedCorrections >= 1) {
-        if (!window.IS_AUTHENTICATED) {
-          window.openRegisterModal();
-          return false;
-        }
-        if (!window.IS_PAYING) {
-          window.openPaymentModal();
-          return false;
-        }
-      }
-      return true;
+  if (appliedCorrections >= 1) {
+    // ✅ Save current highlights before redirect/login flow
+    persistHighlightedState();
+
+    if (!window.IS_AUTHENTICATED) {
+      window.openRegisterModal();
+      return false;
     }
+    if (!window.IS_PAYING) {
+      window.openPaymentModal();
+      return false;
+    }
+  }
+  return true;
+}
+
   
     function showTooltipForErrorSpan(errorSpan) {
       if (!tooltip || !errorSpan) return;
@@ -1672,6 +1785,9 @@ function showQualitySummaryForText(text) {
       clearActiveStates();
       hideTooltip();
       activeError = null;
+
+      persistHighlightedState();
+
     }
   
     /* -------------------------------
@@ -1714,16 +1830,26 @@ function showQualitySummaryForText(text) {
     /* -------------------------------
        INIT
     --------------------------------*/
-    const saved = sessionStorage.getItem("tc_text");
-    if (saved) {
-      lastPlainText = saved;
-      editor.innerHTML = htmlWithNewlines(saved);
-    }
-  
-    updateCounts(lastPlainText);
-    enforceLengthLimit(lastPlainText);
-    clearSuggestionsUI();
-    editor.focus();
+    const restored = restoreHighlightedState();
+
+if (!restored) {
+  const saved = sessionStorage.getItem("tc_text");
+  if (saved) {
+    lastPlainText = saved;
+    editor.innerHTML = htmlWithNewlines(saved);
+  }
+
+  updateCounts(lastPlainText);
+  enforceLengthLimit(lastPlainText);
+  clearSuggestionsUI();
+} else {
+  // If restored, keep whatever was stored (highlights + sidebar)
+  // Make sure the count is sane
+  updateSidebarCount();
+}
+
+editor.focus();
+
   
     /* -------------------------------
        INPUT
@@ -1803,6 +1929,9 @@ function showQualitySummaryForText(text) {
 
         // ✅ NEW: Show random "Tekstkvalitet" based on length of the text
         showQualitySummaryForText(data.original_text);
+
+        persistHighlightedState();
+
 
         lastPlainText = data.original_text;
         sessionStorage.setItem("tc_text", lastPlainText);
