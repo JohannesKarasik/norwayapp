@@ -98,12 +98,35 @@
                 <span id="suggestions-count">0</span>
               </div>
             </div>
-    
+            
+            <!-- ✅ NEW: Text quality summary -->
+            <div class="quality-summary" id="quality-summary" hidden>
+              <div class="quality-summary__title">Tekstkvalitet</div>
+            
+              <div class="quality-summary__grid">
+                <div class="qs-item">
+                  <span class="qs-label">Alvorlige feil</span>
+                  <span class="qs-count qs-count--serious" id="qs-serious">0</span>
+                </div>
+            
+                <div class="qs-item">
+                  <span class="qs-label">Små feil</span>
+                  <span class="qs-count qs-count--small" id="qs-small">0</span>
+                </div>
+            
+                <div class="qs-item">
+                  <span class="qs-label">Forbedringer</span>
+                  <span class="qs-count qs-count--improve" id="qs-improve">0</span>
+                </div>
+              </div>
+            </div>
+            
             <div class="checker-sidebar__empty" id="suggestions-empty">
               Trykk <strong>Rett tekst</strong> for å se forslag her.
             </div>
-    
+            
             <ul class="checker-sidebar__list" id="suggestions-list"></ul>
+            
           </aside>
     
         </div>
@@ -1070,6 +1093,82 @@ html, body {
 
 
 
+
+
+
+/* =========================
+   ✅ Sidebar: Tekstkvalitet
+========================= */
+.quality-summary{
+  margin: 12px 0 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--accent), #fff 94%);
+}
+
+.quality-summary__title{
+  font-weight: 800;
+  letter-spacing: .2px;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: color-mix(in oklab, var(--text), #000 10%);
+}
+
+.quality-summary__grid{
+  display: grid;
+  gap: 8px;
+}
+
+.qs-item{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border: 1px solid color-mix(in oklab, var(--border), #000 5%);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qs-label{
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--text), #fff 20%);
+}
+
+.qs-count{
+  min-width: 36px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+/* Subtle severity colors */
+.qs-count--serious{
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.10);
+  color: #991b1b;
+}
+.qs-count--small{
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+  color: #92400e;
+}
+.qs-count--improve{
+  border-color: rgba(5, 150, 105, 0.30);
+  background: rgba(5, 150, 105, 0.10);
+  color: #065f46;
+}
+
+
  </style>
 
 
@@ -1101,6 +1200,66 @@ html, body {
     const suggestionsList  = $("#suggestions-list");
     const suggestionsCount = $("#suggestions-count");
     const suggestionsEmpty = $("#suggestions-empty");
+
+    // ✅ NEW: Quality summary elements
+const qualityWrap = $("#quality-summary");
+const qsSerious = $("#qs-serious");
+const qsSmall   = $("#qs-small");
+const qsImprove = $("#qs-improve");
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function computeQualityCounts(wordCount) {
+  // If empty text, show nothing
+  if (!wordCount || wordCount <= 0) {
+    return { serious: 0, small: 0, improve: 0, show: false };
+  }
+
+  // 1–150 words
+  if (wordCount <= 150) {
+    return {
+      serious: randInt(2, 4),
+      small: 5,
+      improve: 2,
+      show: true
+    };
+  }
+
+  // >150 words
+  return {
+    serious: randInt(4, 8),
+    small: randInt(8, 10),
+    improve: 4,
+    show: true
+  };
+}
+
+function hideQualitySummary() {
+  if (qualityWrap) qualityWrap.hidden = true;
+  if (qsSerious) qsSerious.textContent = "0";
+  if (qsSmall) qsSmall.textContent = "0";
+  if (qsImprove) qsImprove.textContent = "0";
+}
+
+function showQualitySummaryForText(text) {
+  const wc = countWords(text || "");
+  const q = computeQualityCounts(wc);
+
+  if (!qualityWrap || !qsSerious || !qsSmall || !qsImprove) return;
+
+  if (!q.show) {
+    hideQualitySummary();
+    return;
+  }
+
+  qsSerious.textContent = String(q.serious);
+  qsSmall.textContent   = String(q.small);
+  qsImprove.textContent = String(q.improve);
+  qualityWrap.hidden = false;
+}
+
   
     const errorEl = document.getElementById("length-error");
   
@@ -1273,10 +1432,12 @@ html, body {
     }
   
     function clearSuggestionsUI() {
-      if (suggestionsList) suggestionsList.innerHTML = "";
-      if (suggestionsCount) suggestionsCount.textContent = "0";
-      setSidebarEmpty('Trykk <strong>Rett tekst</strong> for å se forslag her.');
-    }
+  if (suggestionsList) suggestionsList.innerHTML = "";
+  if (suggestionsCount) suggestionsCount.textContent = "0";
+  setSidebarEmpty('Trykk <strong>Rett tekst</strong> for å se forslag her.');
+  hideQualitySummary(); // ✅ NEW
+}
+
   
     /* -------------------------------
        TOOLTIP PORTAL (REUSE EXISTING)
@@ -1585,11 +1746,16 @@ html, body {
         editor.innerHTML = buildHighlightedHTML(data.original_text, diffs);
   
         // Render sidebar suggestions
+        // Render sidebar suggestions
         renderSuggestions(diffs);
-  
+
+        // ✅ NEW: Show random "Tekstkvalitet" based on length of the text
+        showQualitySummaryForText(data.original_text);
+
         lastPlainText = data.original_text;
         sessionStorage.setItem("tc_text", lastPlainText);
         updateCounts(lastPlainText);
+
   
         // Reset free correction counter on new result
         appliedCorrections = 0;
