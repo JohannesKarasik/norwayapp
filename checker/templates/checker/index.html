@@ -131,6 +131,16 @@
             Trykk <strong>Rett tekst</strong> for å se forslag her.
           </div>
 
+          <div class="checker-sidebar__locked" id="suggestions-locked" hidden>
+            <p><strong>Logg inn for å se forslagene</strong></p>
+            <p>Opprett konto eller logg inn for å få full oversikt over feilene i teksten.</p>
+          
+            <button type="button" class="btn btn--primary" onclick="window.openAuthModal()">
+              Logg inn
+            </button>
+          </div>
+          
+
           <ul class="checker-sidebar__list" id="suggestions-list"></ul>
         </aside>
 
@@ -1404,6 +1414,23 @@ html, body {
 }
 
 
+.checker-sidebar__locked{
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.checker-sidebar__locked p{
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.checker-sidebar__locked .btn{
+  margin-top: 12px;
+}
+
  </style>
 
 
@@ -1445,6 +1472,25 @@ const qsImprove = $("#qs-improve");
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+
+const suggestionsLocked = document.getElementById("suggestions-locked");
+
+function lockSidebarForAuth() {
+  // Hide real content
+  if (suggestionsList) suggestionsList.innerHTML = "";
+  if (suggestionsEmpty) suggestionsEmpty.hidden = true;
+  if (qualityWrap) qualityWrap.hidden = true;
+  if (suggestionsCount) suggestionsCount.textContent = "0";
+
+  // Show locked message
+  if (suggestionsLocked) suggestionsLocked.hidden = false;
+}
+
+function unlockSidebar() {
+  if (suggestionsLocked) suggestionsLocked.hidden = true;
+}
+
 
 function computeQualityCounts(wordCount) {
   // If empty text, show nothing
@@ -1850,16 +1896,22 @@ function pickBadge(original, suggestion, id) {
       const item = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
       item?.classList.add("is-active");
     }
-  
+
+    
     function gateIfNeededForApply() {
   // Allow exactly ONE free apply
   if (appliedCorrections >= 1 && !window.IS_AUTHENTICATED) {
     persistHighlightedState();
+
+    // 🔒 Lock sidebar immediately
+    lockSidebarForAuth();
+
     window.openRegisterModal();
     return false;
   }
   return true;
 }
+
 
 
   
@@ -2108,8 +2160,13 @@ editor.focus();
       // Clear stale suggestions when user edits
       clearSuggestionsUI();
       clearActiveStates();
-      hideTooltip();
-      activeError = null;
+hideTooltip();
+activeError = null;
+
+unlockSidebar();
+
+return true;
+
   
       enforceLengthLimit(lastPlainText);
     });
