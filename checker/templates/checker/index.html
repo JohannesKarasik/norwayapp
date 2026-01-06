@@ -1084,11 +1084,15 @@ html, body {
 }
 
 
-/* Make ONLY the editor (text area) taller */
+/* ✅ Keep editor height EXACTLY the same (never grow) */
 #text-editor.editor{
-  min-height: 425px;              /* adjust: 520–700px */
-  max-height: calc(100vh - 320px);/* prevents it from getting too huge */
-  overflow-y: auto;               /* scroll inside the editor */
+  height: 425px !important;
+  min-height: 425px !important;
+  max-height: 425px !important;
+
+  overflow-y: auto !important;   /* scroll inside editor */
+  overflow-x: hidden !important;
+  box-sizing: border-box;
 }
 
 
