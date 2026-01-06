@@ -1898,32 +1898,45 @@ function pickBadge(original, suggestion, id) {
       item?.classList.add("is-active");
     }
 
-    
     function gateIfNeededForApply() {
-  // Allow exactly ONE free apply
-  if (appliedCorrections >= 1 && !window.IS_AUTHENTICATED) {
+  // 1️⃣ Not logged in → force signup
+  if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
-
-    // 🔒 Lock sidebar immediately
     lockSidebarForAuth();
-
     window.openRegisterModal();
     return false;
   }
+
+  // 2️⃣ Logged in but NOT paying → force payment
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+    persistHighlightedState();
+    window.openPaymentModal();
+    return false;
+  }
+
+  // 3️⃣ Paying user → allow
   return true;
 }
+
 
 function gateIfNeededForHighlight() {
-  // Allow exactly ONE free interaction with a highlight
-  if (appliedCorrections >= 1 && !window.IS_AUTHENTICATED) {
+  // Not logged in → signup
+  if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
     lockSidebarForAuth();
     window.openRegisterModal();
     return false;
   }
+
+  // Logged in but not paying → payment
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+    persistHighlightedState();
+    window.openPaymentModal();
+    return false;
+  }
+
   return true;
 }
-
 
 
 
@@ -2255,8 +2268,12 @@ return true;
 
   
         // Reset free correction counter on new result
-        appliedCorrections = 0;
-        sessionStorage.setItem("appliedCorrections", "0");
+// Reset free correction counter ONLY for anonymous users
+if (!window.IS_AUTHENTICATED) {
+  appliedCorrections = 0;
+  sessionStorage.setItem("appliedCorrections", "0");
+}
+
   
         clearActiveStates();
         hideTooltip();
