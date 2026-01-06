@@ -151,7 +151,7 @@
           blockquote { border-left: 4px solid #ccc; padding-left: 10px; color: #555; margin: 20px 0; }
         </style>
 
-        <h1>Rett skriv feilfritt med Rettskriving Sjekk</h1>
+        <h1>Skriv feilfritt med Rettskriving Sjekk</h1>
       
         <p>Rettskriving Sjekk er et avansert og brukervennlig korrekturverktøy som hjelper deg med å forbedre skrivefeil, grammatikkfeil, stavefeil og tegnsettingsfeil på norsk – på sekunder.</p>
       
@@ -1717,9 +1717,10 @@ function restoreHighlightedState() {
 
     // ✅ Random-looking but stable badge per error (doesn't change each click)
 const BADGES = [
-  { key: "serious", text: "Alvorlig fejl" },
-  { key: "error",   text: "Fejl" },
-  { key: "improve", text: "Forbedring" },
+  { key: "serious", text: "Alvorlig feil" },
+  { key: "error",   text: "Feil" },
+  { key: "improve", text: "Forbedring" }, // this one is fine in Norwegian
+
 ];
 
 function stableHash(str) {
@@ -1752,7 +1753,7 @@ function pickBadge(original, suggestion, id) {
       data-original="${escapeHTML(d.original)}"
       data-suggestion="${escapeHTML(d.suggestion)}"
       data-badge="${escapeHTML(d.badgeKey || "error")}"
-      data-badge-text="${escapeHTML(d.badgeText || "Fejl")}"
+      data-badge-text="${escapeHTML(d.badgeText || "Feil")}"
     >${escapeHTML(d.original)}</span>`;
     last = d.end;
   }
@@ -1876,7 +1877,7 @@ function showTooltipForErrorSpan(errorSpan) {
   const orig = errorSpan.dataset.original || "";
   const sugg = errorSpan.dataset.suggestion || "";
   const badgeKey = errorSpan.dataset.badge || "error";
-  const badgeText = errorSpan.dataset.badgeText || "Fejl";
+  const badgeText = errorSpan.dataset.badgeText || "Feil";
 
   tooltip.innerHTML = `
     <div class="tc-tip" role="dialog" aria-label="Forslag">
