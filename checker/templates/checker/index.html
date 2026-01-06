@@ -1925,23 +1925,21 @@ function pickBadge(original, suggestion, id) {
   if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
     sessionStorage.removeItem("tc_payment_gate_triggered");
-
     lockSidebarForAuth();
     window.openRegisterModal();
     return false;
   }
 
-  // Logged in but NOT paying
-  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-
-    // 🔒 First interaction after login → trigger payment gate
+  // Logged in but NOT paying → show payment modal when they try to APPLY
+  if (!window.IS_PAYING) {
+    // (Optional) only show once per session
     if (!hasTriggeredPaymentGate()) {
       triggerPaymentGate();
-      persistHighlightedState();
-      lockSidebarForPayment();
-      window.openPaymentModal();
     }
 
+    // ✅ Keep highlights + sidebar visible (DO NOT clear/lock sidebar)
+    persistHighlightedState();
+    window.openPaymentModal();
     return false;
   }
 
@@ -1958,19 +1956,8 @@ function gateIfNeededForHighlight() {
     return false;
   }
 
-  // Logged in but NOT paying
-  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-
-    if (!hasTriggeredPaymentGate()) {
-      triggerPaymentGate();
-      persistHighlightedState();
-      lockSidebarForPayment();
-      window.openPaymentModal();
-    }
-
-    return false;
-  }
-
+  // ✅ Logged in but not paying: allow clicking highlights + opening tooltip.
+  // Payment gate happens ONLY on "Apply".
   return true;
 }
 
