@@ -132,14 +132,6 @@
           </div>
 
           <ul class="checker-sidebar__list" id="suggestions-list"></ul>
-
-<!-- ✅ Upsell when user hasn't paid -->
-<div class="sidebar-upsell" id="sidebar-upsell" hidden>
-  <button type="button" class="sidebar-upsell__btn" id="sidebar-upsell-btn">
-    Se alle rettelser
-  </button>
-</div>
-
         </aside>
 
       </div>
@@ -1412,30 +1404,6 @@ html, body {
 }
 
 
-
-/* ✅ "Se alle rettelser" upsell block */
-.sidebar-upsell{
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-upsell__btn{
-  width: 100%;
-  border: 1px dashed color-mix(in oklab, var(--accent), var(--border) 55%);
-  background: color-mix(in oklab, var(--accent), #fff 92%);
-  color: color-mix(in oklab, var(--accent), #000 22%);
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.sidebar-upsell__btn:hover{
-  background: color-mix(in oklab, var(--accent), #fff 88%);
-}
-
-
  </style>
 
 
@@ -1467,9 +1435,6 @@ html, body {
     const suggestionsList  = $("#suggestions-list");
     const suggestionsCount = $("#suggestions-count");
     const suggestionsEmpty = $("#suggestions-empty");
-    const upsellWrap = $("#sidebar-upsell");
-    const upsellBtn  = $("#sidebar-upsell-btn");
-
 
     // ✅ NEW: Quality summary elements
 const qualityWrap = $("#quality-summary");
@@ -1800,24 +1765,6 @@ function pickBadge(original, suggestion, id) {
     /* -------------------------------
        SIDEBAR RENDER
     --------------------------------*/
-
-
-    function renderSidebarLocked(message) {
-  if (!suggestionsList || !suggestionsEmpty) return;
-
-  suggestionsList.innerHTML = "";
-  suggestionsEmpty.hidden = false;
-  suggestionsEmpty.innerHTML = `
-    <div style="padding:8px 0">
-      <strong>${message}</strong><br>
-      <span style="opacity:.75">Logg inn for å se alle rettelser.</span>
-    </div>
-  `;
-
-  if (upsellWrap) upsellWrap.hidden = true;
-}
-
-
     function setSidebarEmpty(message) {
       if (!suggestionsEmpty) return;
       suggestionsEmpty.hidden = false;
@@ -1834,34 +1781,22 @@ function pickBadge(original, suggestion, id) {
 }
 
   
-function renderSuggestions(diffs) {
+    function renderSuggestions(diffs) {
   if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
 
-  // 🔒 NOT LOGGED IN → lock sidebar completely
-  if (!window.IS_AUTHENTICATED) {
-    renderSidebarLocked("Logg inn for å se rettelser");
-    return;
-  }
 
-  // No errors
+
   if (!diffs.length) {
     suggestionsList.innerHTML = "";
     setSidebarEmpty("Ingen feil funnet 🎉");
-    if (upsellWrap) upsellWrap.hidden = true;
     return;
   }
 
   hideSidebarEmpty();
 
-  // 🔓 Logged in but NOT paid → limit suggestions
-  const isLimited = !window.IS_PAYING;
-  const shownDiffs = isLimited ? diffs.slice(0, 2) : diffs;
-
-  suggestionsList.innerHTML = shownDiffs.map(d => `
+  suggestionsList.innerHTML = diffs.map(d => `
     <li class="s-item" data-error-id="${escapeHTML(d.id)}">
-      <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">
-        ${escapeHTML(d.badgeText || "Feil")}
-      </div>
+      <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Fejl")}</div>
 
       <button type="button" class="s-jump" data-jump>
         <div class="s-line">
@@ -1877,22 +1812,15 @@ function renderSuggestions(diffs) {
       </div>
     </li>
   `).join("");
-
-  // 🔔 Show upsell ONLY when logged in but not paid
-  if (upsellWrap) {
-    upsellWrap.hidden = !isLimited;
-  }
 }
 
-
-function clearSuggestionsUI() {
+  
+    function clearSuggestionsUI() {
   if (suggestionsList) suggestionsList.innerHTML = "";
   if (suggestionsCount) suggestionsCount.textContent = "0";
   setSidebarEmpty('Trykk <strong>Rett tekst</strong> for å se forslag her.');
-  hideQualitySummary();
-  if (upsellWrap) upsellWrap.hidden = true;
+  hideQualitySummary(); // ✅ NEW
 }
-
 
   
     /* -------------------------------
