@@ -1495,6 +1495,17 @@ function showQualitySummaryForText(text) {
   qualityWrap.hidden = false;
 }
 
+function syncTotalSuggestionsFromQuality() {
+  if (!suggestionsCount || !qsSerious || !qsSmall || !qsImprove) return;
+
+  const total =
+    Number(qsSerious.textContent || 0) +
+    Number(qsSmall.textContent || 0) +
+    Number(qsImprove.textContent || 0);
+
+  suggestionsCount.textContent = String(total);
+}
+
   
     const errorEl = document.getElementById("length-error");
   
@@ -1578,7 +1589,7 @@ function restoreHighlightedState() {
   // Restore counts (or recompute)
   if (suggestionsCount) {
     const c = sessionStorage.getItem(TC_STATE.sidebarCount);
-    suggestionsCount.textContent = c || String(suggestionsList?.querySelectorAll(".s-item").length || 0);
+    syncTotalSuggestionsFromQuality();
   }
 
   // Restore quality summary
@@ -1765,18 +1776,14 @@ function pickBadge(original, suggestion, id) {
     }
   
     function updateSidebarCount() {
-      if (!suggestionsCount || !suggestionsList) return;
-      const n = suggestionsList.querySelectorAll(".s-item").length;
-      suggestionsCount.textContent = String(n);
-      if (n === 0) {
-        setSidebarEmpty("Ingen forslag akkurat nå.");
-      }
-    }
+  syncTotalSuggestionsFromQuality();
+}
+
   
     function renderSuggestions(diffs) {
   if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
 
-  suggestionsCount.textContent = String(diffs.length);
+
 
   if (!diffs.length) {
     suggestionsList.innerHTML = "";
@@ -2169,6 +2176,8 @@ editor.focus();
 
         // ✅ NEW: Show random "Tekstkvalitet" based on length of the text
         showQualitySummaryForText(data.original_text);
+        syncTotalSuggestionsFromQuality();
+
 
         persistHighlightedState();
 
