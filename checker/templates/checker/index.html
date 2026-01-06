@@ -853,8 +853,12 @@ html, body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 18px;
-  align-items: start;
+
+  /* NEW: fill more vertical space */
+  min-height: calc(100vh - 260px); /* tweak 260px up/down */
+  align-items: stretch;
 }
+
 
 .checker-main{
   min-width: 0;
@@ -863,13 +867,14 @@ html, body {
 .checker-sidebar{
   position: sticky;
   top: 18px;
-  align-self: start;
+  align-self: stretch;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: #fff;
   padding: 14px;
   min-height: 220px;
 }
+
 
 .checker-sidebar__head{
   display: flex;
