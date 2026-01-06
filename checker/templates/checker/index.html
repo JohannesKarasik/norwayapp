@@ -1477,6 +1477,16 @@ function randInt(min, max) {
 
 const suggestionsLocked = document.getElementById("suggestions-locked");
 
+
+function hasTriggeredPaymentGate() {
+  return sessionStorage.getItem("tc_payment_gate_triggered") === "1";
+}
+
+function triggerPaymentGate() {
+  sessionStorage.setItem("tc_payment_gate_triggered", "1");
+}
+
+
 function lockSidebarForAuth() {
   // Hide real content
   if (suggestionsList) suggestionsList.innerHTML = "";
@@ -1487,6 +1497,18 @@ function lockSidebarForAuth() {
   // Show locked message
   if (suggestionsLocked) suggestionsLocked.hidden = false;
 }
+
+function lockSidebarForPayment() {
+  if (suggestionsList) suggestionsList.innerHTML = "";
+  if (suggestionsEmpty) {
+    suggestionsEmpty.hidden = false;
+    suggestionsEmpty.innerHTML =
+      "Full tilgang krever abonnement. Start gratis prøve for å fortsette.";
+  }
+  if (qualityWrap) qualityWrap.hidden = true;
+  if (suggestionsCount) suggestionsCount.textContent = "0";
+}
+
 
 function unlockSidebar() {
   if (suggestionsLocked) suggestionsLocked.hidden = true;
@@ -1899,7 +1921,34 @@ function pickBadge(original, suggestion, id) {
     }
 
     function gateIfNeededForApply() {
-  // 1️⃣ Not logged in → force signup
+  // Not logged in → register
+  if (!window.IS_AUTHENTICATED) {
+    persistHighlightedState();
+    lockSidebarForAuth();
+    window.openRegisterModal();
+    return false;
+  }
+
+  // Logged in but NOT paying
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+
+    // 🔒 First interaction after login → trigger payment gate
+    if (!hasTriggeredPaymentGate()) {
+      triggerPaymentGate();
+      persistHighlightedState();
+      lockSidebarForPayment();
+      window.openPaymentModal();
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+
+function gateIfNeededForHighlight() {
+  // Not logged in → register
   if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
     lockSidebarForAuth();
@@ -1907,37 +1956,21 @@ function pickBadge(original, suggestion, id) {
     return false;
   }
 
-  // 2️⃣ Logged in but NOT paying → force payment
+  // Logged in but NOT paying
   if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-    persistHighlightedState();
-    window.openPaymentModal();
-    return false;
-  }
 
-  // 3️⃣ Paying user → allow
-  return true;
-}
+    if (!hasTriggeredPaymentGate()) {
+      triggerPaymentGate();
+      persistHighlightedState();
+      lockSidebarForPayment();
+      window.openPaymentModal();
+    }
 
-
-function gateIfNeededForHighlight() {
-  // Not logged in → signup
-  if (!window.IS_AUTHENTICATED) {
-    persistHighlightedState();
-    lockSidebarForAuth();
-    window.openRegisterModal();
-    return false;
-  }
-
-  // Logged in but not paying → payment
-  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-    persistHighlightedState();
-    window.openPaymentModal();
     return false;
   }
 
   return true;
 }
-
 
 
   
@@ -2184,6 +2217,9 @@ editor.focus();
       // Editing resets free usage
       appliedCorrections = 0;
       sessionStorage.setItem("appliedCorrections", "0");
+      // 🔓 Reset payment gate when text changes
+sessionStorage.removeItem("tc_payment_gate_triggered");
+
   
       // Clear stale suggestions when user edits
       clearSuggestionsUI();
