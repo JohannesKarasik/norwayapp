@@ -50,45 +50,66 @@
 
 
      <div class="card__body">
-       <form method="POST" id="form">
-         {% csrf_token %}
-
-
-         <div
-           id="text-editor"
-           class="editor"
-           contenteditable="true"
-           role="textbox"
-           aria-multiline="true"
-           spellcheck="false"
-           placeholder="Lim inn teksten din her..."></div>
-           <p id="length-error" class="length-error" hidden>
-            Teksten er for lang. Du kan rette maks 800 tegn om gangen.
-
-           </p>
-          
-
-
-         <div class="meta" id="counter">
-           <div class="counter" aria-live="polite">
-            <span id="words">0</span> ord
-            <span>·</span>
-            <span id="chars">0</span> tegn
-            
-           </div>
-         </div>
-
-
-         <div class="actions">
-          <button type="submit" id="submit" class="btn btn--primary">
-            <span class="spinner" aria-hidden="true"></span>
-            Rett tekst
-          </button>
-          <button class="btn btn--ghost" id="clear">Tøm</button>
-          
-         </div>
-       </form>
-     </div>
+      <form method="POST" id="form">
+        {% csrf_token %}
+    
+        <div class="checker-layout">
+    
+          <!-- LEFT: editor -->
+          <div class="checker-main">
+            <div
+              id="text-editor"
+              class="editor"
+              contenteditable="true"
+              role="textbox"
+              aria-multiline="true"
+              spellcheck="false"
+              placeholder="Lim inn teksten din her..."></div>
+    
+            <p id="length-error" class="length-error" hidden>
+              Teksten er for lang. Du kan rette maks 800 ord om gangen.
+            </p>
+    
+            <div class="meta" id="counter">
+              <div class="counter" aria-live="polite">
+                <span id="words">0</span> ord
+                <span>·</span>
+                <span id="chars">0</span> tegn
+              </div>
+            </div>
+    
+            <div class="actions">
+              <button type="submit" id="submit" class="btn btn--primary">
+                <span class="spinner" aria-hidden="true"></span>
+                Rett tekst
+              </button>
+              <button type="button" class="btn btn--ghost" id="clear">Tøm</button>
+            </div>
+          </div>
+    
+          <!-- RIGHT: sidebar (Grammarly-style) -->
+          <aside class="checker-sidebar" id="suggestions-panel" aria-label="Forslag">
+            <div class="checker-sidebar__head">
+              <div>
+                <div class="checker-sidebar__title">Forslag</div>
+                <div class="checker-sidebar__sub">Klikk et forslag for å hoppe til feilen.</div>
+              </div>
+              <div class="checker-sidebar__count">
+                <span id="suggestions-count">0</span>
+              </div>
+            </div>
+    
+            <div class="checker-sidebar__empty" id="suggestions-empty">
+              Trykk <strong>Rett tekst</strong> for å se forslag her.
+            </div>
+    
+            <ul class="checker-sidebar__list" id="suggestions-list"></ul>
+          </aside>
+    
+        </div>
+      </form>
+    </div>
+    
 
 
      <div class="card__body">
@@ -824,407 +845,708 @@ html, body {
 }
 
 
+
+/* =========================
+   Grammarly-style sidebar
+========================= */
+.checker-layout{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.checker-main{
+  min-width: 0;
+}
+
+.checker-sidebar{
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  min-height: 220px;
+}
+
+.checker-sidebar__head{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+
+.checker-sidebar__title{
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.checker-sidebar__sub{
+  margin-top: 2px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--text), #fff 35%);
+}
+
+.checker-sidebar__count{
+  min-width: 34px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  border: 1px solid color-mix(in oklab, var(--accent), #fff 60%);
+  background: color-mix(in oklab, var(--accent), #fff 92%);
+  color: color-mix(in oklab, var(--accent), #000 22%);
+}
+
+.checker-sidebar__empty{
+  font-size: 14px;
+  color: color-mix(in oklab, var(--text), #fff 35%);
+  padding: 10px 2px;
+}
+
+.checker-sidebar__list{
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.s-item{
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.s-item.is-active{
+  border-color: color-mix(in oklab, var(--accent), #fff 45%);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent), #fff 82%);
+}
+
+.s-jump{
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.s-line{
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.s-bad{
+  font-weight: 800;
+  color: #991b1b;
+}
+
+.s-arrow{
+  opacity: .7;
+}
+
+.s-good{
+  font-weight: 800;
+  color: #065f46;
+}
+
+.s-actions{
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.s-btn{
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.s-btn:hover{
+  background: #f8fafc;
+}
+
+.s-btn--primary{
+  border-color: color-mix(in oklab, var(--accent), #fff 55%);
+  background: color-mix(in oklab, var(--accent), #fff 92%);
+  color: color-mix(in oklab, var(--accent), #000 22%);
+}
+
+/* Highlight active error in editor */
+#text-editor .error.is-active{
+  box-shadow:
+    inset 0 -2px 0 rgba(239, 68, 68, 0.95),
+    0 0 0 3px color-mix(in oklab, var(--accent), #fff 82%);
+}
+
+/* Responsive: stack sidebar under editor */
+@media (max-width: 980px){
+  .checker-layout{
+    grid-template-columns: 1fr;
+  }
+  .checker-sidebar{
+    position: relative;
+    top: 0;
+  }
+}
+
  </style>
 
 
 
 
- <script>
+<script>
   (function () {
-  console.log("✅ main.js loaded");
-  document.addEventListener("click", (e) => {
-    console.log("🌍 GLOBAL CLICK:", e.target);
-  });
-
-  function openAuthModal(){
-    window.openAuthModal && window.openAuthModal();
-  }
-  
-  
-  const MAX_WORDS = 800;
-
-  function countWords(text) {
-    return (text.trim().match(/\S+/g) || []).length;
-  }
-  
-
-
-  const errorEl = document.getElementById("length-error");
-
-  function enforceLengthLimit(text) {
-    const wordCount = countWords(text);
-    const tooLong = wordCount > MAX_WORDS;
-  
-    submit.disabled = tooLong;
-    submit.classList.toggle("is-disabled", tooLong);
-  
-    editor.classList.toggle("is-too-long", tooLong);
-  
-    if (errorEl) {
-      errorEl.hidden = !tooLong;
-      errorEl.textContent =
-        "Texten är för lång. Du kan rätta max 800 ord åt gången.";
-    }
-  }
-  
-  
-  
-
-  const $ = (s, scope = document) => scope.querySelector(s);
-
-  const editor   = $("#text-editor");
-  const wordsEl  = $("#words");
-  const charsEl  = $("#chars");
-  const form     = $("#form");
-  const submit   = $("#submit");
-  const clearBtn = $("#clear");
-
-  if (!editor || !form) return;
-
-  let lastPlainText = "";
-  let activeError = null;
-
-  // 🔐 Free usage gating
-let appliedCorrections = Number(
-  sessionStorage.getItem("appliedCorrections") || 0
-);
-
-
-  /* -------------------------------
-     TEXT HELPERS
-  --------------------------------*/
-  function escapeHTML(str) {
-    return (str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function htmlWithNewlines(str) {
-    return escapeHTML(str).replace(/\n/g, "<br>");
-  }
-
-  function getPlainText() {
-    return (editor.innerText || "").replace(/\u00A0/g, " ");
-  }
-
-  function updateCounts(text) {
-    const t = text || "";
-    wordsEl.textContent = (t.trim().match(/\S+/g) || []).length;
-    charsEl.textContent = t.length;
-  }
-
-  /* -------------------------------
-     WORD-LEVEL DIFF
-  --------------------------------*/
-  function tokenizeWords(text) {
-    const tokens = [];
-    // ✅ include optional punctuation as part of the "word" so apply actually changes text
-    const regex = /\p{L}+[.,;:!?]?/gu;
-    let match;
-
-    while ((match = regex.exec(text))) {
-      tokens.push({
-        word: match[0],
-        start: match.index,
-        end: match.index + match[0].length,
-      });
-    }
-    return tokens;
-  }
-
-  function getWordDiffs(original, corrected) {
-    const oWords = tokenizeWords(original);
-    const cWords = tokenizeWords(corrected);
-
-    const diffs = [];
-    const len = Math.min(oWords.length, cWords.length);
-
-    for (let i = 0; i < len; i++) {
-      if (oWords[i].word !== cWords[i].word) {
-        diffs.push({
-          start: oWords[i].start,
-          end: oWords[i].end,
-          original: oWords[i].word,
-          suggestion: cWords[i].word,
-        });
-      }
-    }
-    return diffs;
-  }
-
-  /* -------------------------------
-     RENDER HIGHLIGHTS (UNCHANGED)
-  --------------------------------*/
-  function buildHighlightedHTML(text, diffs) {
-    if (!diffs.length) return htmlWithNewlines(text);
-
-    let html = "";
-    let last = 0;
-
-    for (const d of diffs) {
-      html += htmlWithNewlines(text.slice(last, d.start));
-      html += `<span class="error"
-      data-original="${escapeHTML(d.original)}"
-      data-suggestion="${escapeHTML(d.suggestion)}"
-    >${escapeHTML(d.original)}</span>`;
-    
-          last = d.end;
-    }
-
-    html += htmlWithNewlines(text.slice(last));
-    return html;
-  }
-
-  /* -------------------------------
-     TOOLTIP PORTAL (NO LAYOUT SHIFT)
-  --------------------------------*/
-/* -------------------------------
-   TOOLTIP PORTAL (REUSE EXISTING)
---------------------------------*/
-const tooltip = document.querySelector(".tooltip-portal");
-
-if (!tooltip) {
-  console.error("❌ tooltip-portal not found — it must be created in index.html");
-} else {
-  console.log("✅ Reusing existing tooltip:", tooltip);
-}
-
-window.__tcTooltip = tooltip;
-
-
-  editor.addEventListener("click", (e) => {
-    console.log("🖱️ Editor clicked:", e.target);
-    const error = e.target.closest(".error");
-    if (!error) return;
-  
-    activeError = error;
-
-      // 🚦 GATING LOGIC (after 1 free correction)
-  if (appliedCorrections >= 1) {
-
-  // Not logged in → register
-  if (!window.IS_AUTHENTICATED) {
-    window.openRegisterModal();
-    return;
-  }
-
-  // Logged in but not paying → payment
-  if (!window.IS_PAYING) {
-    window.openPaymentModal();
-    return;
-  }
-  }
-
-    console.log("❗ Active error set:", activeError, {
-      original: error.dataset.original,
-      suggestion: error.dataset.suggestion
+    console.log("✅ main.js loaded");
+    document.addEventListener("click", (e) => {
+      // console.log("🌍 GLOBAL CLICK:", e.target);
     });
   
-    // 1️⃣ Inject tooltip content
-    tooltip.innerHTML = `
-      <div class="suggestion">${error.dataset.suggestion}</div>
-      <div class="actions">
-        <button type="button" class="apply">Tillämpa</button>
-        <button type="button" class="dismiss">Avvisa</button>
-      </div>
-    `;
+    const MAX_WORDS = 800;
   
-    // 2️⃣ Force render (hidden) so dimensions are REAL
-    tooltip.style.visibility = "hidden";
-    tooltip.style.display = "block";
-    tooltip.style.left = "0px";
-    tooltip.style.top = "0px";
-    tooltip.style.transform = "none";
-  
-    // 3️⃣ Measure
-    const wordRect = error.getBoundingClientRect();
-    const tipRect  = tooltip.getBoundingClientRect();
-  
-    const GAP = 12;
-    const PADDING = 8;
-  
-    // 4️⃣ Position ABOVE word (fallback BELOW if needed)
-    let top = wordRect.top - tipRect.height - GAP;
-    if (top < PADDING) {
-      top = wordRect.bottom + GAP;
+    function countWords(text) {
+      return (text.trim().match(/\S+/g) || []).length;
     }
   
-    // 5️⃣ Center horizontally + clamp to viewport
-    let left = wordRect.left + wordRect.width / 2;
-    const minLeft = PADDING + tipRect.width / 2;
-    const maxLeft = window.innerWidth - PADDING - tipRect.width / 2;
-    left = Math.max(minLeft, Math.min(maxLeft, left));
+    const $ = (s, scope = document) => scope.querySelector(s);
   
-    // 6️⃣ Apply final position & show
-    tooltip.style.top = `${top}px`;
-    tooltip.style.left = `${left}px`;
-    tooltip.style.transform = "translateX(-50%)";
-    tooltip.style.visibility = "visible";
-    tooltip.classList.add("visible");
-  });
-
-  /* -------------------------------
-     APPLY / DISMISS (WORKING)
-  --------------------------------*/
-document.addEventListener("click", (e) => {
-  const applyBtn = e.target.closest(".tooltip-portal .apply");
-  const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
-  if (!applyBtn && !dismissBtn) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  if (!activeError) return;
-
-  if (applyBtn) {
-  const suggestion = activeError.dataset.suggestion || "";
-  activeError.replaceWith(document.createTextNode(suggestion));
-
-  // ✅ Count only applied corrections
-  appliedCorrections += 1;
-  sessionStorage.setItem(
-    "appliedCorrections",
-    appliedCorrections.toString()
-  );
-}
- else {
-    const original = activeError.dataset.original || "";
-    activeError.replaceWith(document.createTextNode(original));
-  }
-
-  lastPlainText = getPlainText();
-  sessionStorage.setItem("tc_text", lastPlainText);
-  updateCounts(lastPlainText);
-
-  tooltip.classList.remove("visible");
-  tooltip.style.display = "none";
-  tooltip.style.visibility = "hidden";
-  tooltip.innerHTML = "";
-  activeError = null;
-
-}, true);
-
+    const editor   = $("#text-editor");
+    const wordsEl  = $("#words");
+    const charsEl  = $("#chars");
+    const form     = $("#form");
+    const submit   = $("#submit");
+    const clearBtn = $("#clear");
   
-  /* -------------------------------
-     INIT
-  /* -------------------------------
-     INIT
-  --------------------------------*/
-  /* -------------------------------
-     INIT
-  --------------------------------*/
-  const saved = sessionStorage.getItem("tc_text");
-  if (saved) {
-    lastPlainText = saved;
-    editor.innerHTML = htmlWithNewlines(saved);
-  }
-
-  updateCounts(lastPlainText);
-  editor.focus();
-
-  /* -------------------------------
-     INPUT
-  --------------------------------*/
-  editor.addEventListener("input", () => {
-    lastPlainText = getPlainText();
-    sessionStorage.setItem("tc_text", lastPlainText);
-    updateCounts(lastPlainText);
-    // ✏️ Editing text resets free usage
-  appliedCorrections = 0;
-  sessionStorage.setItem("appliedCorrections", "0");
-
-    
-    enforceLengthLimit(lastPlainText);
-  });
+    // Sidebar elements
+    const suggestionsList  = $("#suggestions-list");
+    const suggestionsCount = $("#suggestions-count");
+    const suggestionsEmpty = $("#suggestions-empty");
   
+    const errorEl = document.getElementById("length-error");
   
-
-  clearBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    editor.innerHTML = "";
-    lastPlainText = "";
-    sessionStorage.removeItem("tc_text");
-    updateCounts("");
-    editor.focus();
-  });
-
-  /* -------------------------------
-     SUBMIT
-  --------------------------------*/
-  form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  // 🔒 Require login before using the tool
-// 🔒 Require login
-
-
-
-  const text = lastPlainText.trim();
-  if (!text) return;
-
+    if (!editor || !form) return;
   
-    // 🚫 HARD STOP — NEVER allow loading when too long
-    const wordCount = countWords(text);
-
-    if (wordCount > MAX_WORDS) {
-      enforceLengthLimit(text);
-      submit.classList.remove("is-loading");
-      return;
+    let lastPlainText = "";
+    let activeError = null;
+  
+    // 🔐 Free usage gating
+    let appliedCorrections = Number(
+      sessionStorage.getItem("appliedCorrections") || 0
+    );
+  
+    /* -------------------------------
+       TEXT HELPERS
+    --------------------------------*/
+    function escapeHTML(str) {
+      return (str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
     }
-    
   
-    // ✅ Only now we allow loading
-    submit.disabled = true;
-    submit.classList.add("is-loading");
+    function htmlWithNewlines(str) {
+      return escapeHTML(str).replace(/\n/g, "<br>");
+    }
   
-    try {
-      const res = await fetch("/", {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
-          "X-Requested-With": "XMLHttpRequest",
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ text }),
-      });
+    function getPlainText() {
+      return (editor.innerText || "").replace(/\u00A0/g, " ");
+    }
   
-
-
+    function updateCounts(text) {
+      const t = text || "";
+      wordsEl.textContent = (t.trim().match(/\S+/g) || []).length;
+      charsEl.textContent = t.length;
+    }
   
-      const data = await res.json();
-      const diffs = getWordDiffs(
-        data.original_text,
-        data.corrected_text
-      );
+    function enforceLengthLimit(text) {
+      const wordCount = countWords(text);
+      const tooLong = wordCount > MAX_WORDS;
   
-      editor.innerHTML = buildHighlightedHTML(
-        data.original_text,
-        diffs
-      );
+      submit.disabled = tooLong;
+      submit.classList.toggle("is-disabled", tooLong);
   
-      lastPlainText = data.original_text;
+      editor.classList.toggle("is-too-long", tooLong);
+  
+      if (errorEl) {
+        errorEl.hidden = !tooLong;
+        errorEl.textContent =
+          "Teksten er for lang. Du kan rette maks 800 ord om gangen.";
+      }
+    }
+  
+    /* -------------------------------
+       WORD-LEVEL DIFF
+    --------------------------------*/
+    function tokenizeWords(text) {
+      const tokens = [];
+      // include optional punctuation as part of the "word"
+      const regex = /\p{L}+[.,;:!?]?/gu;
+      let match;
+  
+      while ((match = regex.exec(text))) {
+        tokens.push({
+          word: match[0],
+          start: match.index,
+          end: match.index + match[0].length,
+        });
+      }
+      return tokens;
+    }
+  
+    function getWordDiffs(original, corrected) {
+      const oWords = tokenizeWords(original);
+      const cWords = tokenizeWords(corrected);
+  
+      const diffs = [];
+      const len = Math.min(oWords.length, cWords.length);
+  
+      for (let i = 0; i < len; i++) {
+        if (oWords[i].word !== cWords[i].word) {
+          diffs.push({
+            id: String(diffs.length),
+            start: oWords[i].start,
+            end: oWords[i].end,
+            original: oWords[i].word,
+            suggestion: cWords[i].word,
+          });
+        }
+      }
+      return diffs;
+    }
+  
+    /* -------------------------------
+       RENDER HIGHLIGHTS
+    --------------------------------*/
+    function buildHighlightedHTML(text, diffs) {
+      if (!diffs.length) return htmlWithNewlines(text);
+  
+      let html = "";
+      let last = 0;
+  
+      for (const d of diffs) {
+        html += htmlWithNewlines(text.slice(last, d.start));
+        html += `<span class="error"
+          data-error-id="${escapeHTML(d.id)}"
+          data-original="${escapeHTML(d.original)}"
+          data-suggestion="${escapeHTML(d.suggestion)}"
+        >${escapeHTML(d.original)}</span>`;
+        last = d.end;
+      }
+  
+      html += htmlWithNewlines(text.slice(last));
+      return html;
+    }
+  
+    /* -------------------------------
+       SIDEBAR RENDER
+    --------------------------------*/
+    function setSidebarEmpty(message) {
+      if (!suggestionsEmpty) return;
+      suggestionsEmpty.hidden = false;
+      suggestionsEmpty.innerHTML = message;
+    }
+  
+    function hideSidebarEmpty() {
+      if (!suggestionsEmpty) return;
+      suggestionsEmpty.hidden = true;
+    }
+  
+    function updateSidebarCount() {
+      if (!suggestionsCount || !suggestionsList) return;
+      const n = suggestionsList.querySelectorAll(".s-item").length;
+      suggestionsCount.textContent = String(n);
+      if (n === 0) {
+        setSidebarEmpty("Ingen forslag akkurat nå.");
+      }
+    }
+  
+    function renderSuggestions(diffs) {
+      if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
+  
+      suggestionsCount.textContent = String(diffs.length);
+  
+      if (!diffs.length) {
+        suggestionsList.innerHTML = "";
+        setSidebarEmpty("Ingen feil funnet 🎉");
+        return;
+      }
+  
+      hideSidebarEmpty();
+  
+      suggestionsList.innerHTML = diffs.map(d => `
+        <li class="s-item" data-error-id="${escapeHTML(d.id)}">
+          <button type="button" class="s-jump" data-jump>
+            <div class="s-line">
+              <span class="s-bad">${escapeHTML(d.original)}</span>
+              <span class="s-arrow">→</span>
+              <span class="s-good">${escapeHTML(d.suggestion)}</span>
+            </div>
+          </button>
+  
+          <div class="s-actions">
+            <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+            <button type="button" class="s-btn" data-dismiss>Avvis</button>
+          </div>
+        </li>
+      `).join("");
+    }
+  
+    function clearSuggestionsUI() {
+      if (suggestionsList) suggestionsList.innerHTML = "";
+      if (suggestionsCount) suggestionsCount.textContent = "0";
+      setSidebarEmpty('Trykk <strong>Rett tekst</strong> for å se forslag her.');
+    }
+  
+    /* -------------------------------
+       TOOLTIP PORTAL (REUSE EXISTING)
+    --------------------------------*/
+    const tooltip = document.querySelector(".tooltip-portal");
+  
+    if (!tooltip) {
+      console.error("❌ tooltip-portal not found — it must be created in index.html");
+    } else {
+      console.log("✅ Reusing existing tooltip:", tooltip);
+    }
+  
+    window.__tcTooltip = tooltip;
+  
+    function clearActiveStates() {
+      editor.querySelectorAll(".error.is-active").forEach(el => el.classList.remove("is-active"));
+      suggestionsList?.querySelectorAll(".s-item.is-active").forEach(el => el.classList.remove("is-active"));
+    }
+  
+    function setActiveById(errorId) {
+      clearActiveStates();
+  
+      const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
+      span?.classList.add("is-active");
+  
+      const item = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
+      item?.classList.add("is-active");
+    }
+  
+    function gateIfNeeded() {
+      if (appliedCorrections >= 1) {
+        if (!window.IS_AUTHENTICATED) {
+          window.openRegisterModal();
+          return false;
+        }
+        if (!window.IS_PAYING) {
+          window.openPaymentModal();
+          return false;
+        }
+      }
+      return true;
+    }
+  
+    function showTooltipForErrorSpan(errorSpan) {
+      if (!tooltip || !errorSpan) return;
+  
+      activeError = errorSpan;
+  
+      tooltip.innerHTML = `
+        <div class="suggestion">${escapeHTML(errorSpan.dataset.suggestion || "")}</div>
+        <div class="actions">
+          <button type="button" class="apply">Tillämpa</button>
+          <button type="button" class="dismiss">Avvisa</button>
+        </div>
+      `;
+  
+      // Force render to measure
+      tooltip.style.visibility = "hidden";
+      tooltip.style.display = "block";
+      tooltip.style.left = "0px";
+      tooltip.style.top = "0px";
+      tooltip.style.transform = "none";
+  
+      const wordRect = errorSpan.getBoundingClientRect();
+      const tipRect  = tooltip.getBoundingClientRect();
+  
+      const GAP = 12;
+      const PADDING = 8;
+  
+      let top = wordRect.top - tipRect.height - GAP;
+      if (top < PADDING) top = wordRect.bottom + GAP;
+  
+      let left = wordRect.left + wordRect.width / 2;
+      const minLeft = PADDING + tipRect.width / 2;
+      const maxLeft = window.innerWidth - PADDING - tipRect.width / 2;
+      left = Math.max(minLeft, Math.min(maxLeft, left));
+  
+      tooltip.style.top = `${top}px`;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.transform = "translateX(-50%)";
+      tooltip.style.visibility = "visible";
+      tooltip.classList.add("visible");
+    }
+  
+    /* -------------------------------
+       CLICK IN EDITOR → TOOLTIP
+    --------------------------------*/
+    editor.addEventListener("click", (e) => {
+      const error = e.target.closest(".error");
+      if (!error) return;
+  
+      if (!gateIfNeeded()) return;
+  
+      const id = error.dataset.errorId || "";
+      if (id) setActiveById(id);
+  
+      showTooltipForErrorSpan(error);
+    });
+  
+    /* -------------------------------
+       SIDEBAR EVENTS (JUMP / APPLY / DISMISS)
+    --------------------------------*/
+    suggestionsList?.addEventListener("click", (e) => {
+      const item = e.target.closest(".s-item");
+      if (!item) return;
+  
+      const errorId = item.dataset.errorId || "";
+      if (!errorId) return;
+  
+      // Jump
+      if (e.target.closest("[data-jump]")) {
+        if (!gateIfNeeded()) return;
+  
+        const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
+        if (!span) {
+          // already applied/dismissed
+          item.remove();
+          updateSidebarCount();
+          return;
+        }
+  
+        setActiveById(errorId);
+        span.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        showTooltipForErrorSpan(span);
+        return;
+      }
+  
+      // Apply from sidebar
+      if (e.target.closest("[data-apply]")) {
+        if (!gateIfNeeded()) return;
+        applyOrDismissById(errorId, "apply");
+        return;
+      }
+  
+      // Dismiss from sidebar
+      if (e.target.closest("[data-dismiss]")) {
+        if (!gateIfNeeded()) return;
+        applyOrDismissById(errorId, "dismiss");
+        return;
+      }
+    });
+  
+    function removeSidebarItemById(errorId) {
+      const li = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
+      li?.remove();
+      updateSidebarCount();
+    }
+  
+    function hideTooltip() {
+      if (!tooltip) return;
+      tooltip.classList.remove("visible");
+      tooltip.style.display = "none";
+      tooltip.style.visibility = "hidden";
+      tooltip.innerHTML = "";
+    }
+  
+    function applyOrDismissById(errorId, action) {
+      const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
+      if (!span) {
+        removeSidebarItemById(errorId);
+        return;
+      }
+  
+      if (action === "apply") {
+        const suggestion = span.dataset.suggestion || "";
+        span.replaceWith(document.createTextNode(suggestion));
+  
+        appliedCorrections += 1;
+        sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
+      } else {
+        const original = span.dataset.original || "";
+        span.replaceWith(document.createTextNode(original));
+      }
+  
+      lastPlainText = getPlainText();
       sessionStorage.setItem("tc_text", lastPlainText);
       updateCounts(lastPlainText);
-
-      // 🔁 Reset free correction counter on new result
+  
+      removeSidebarItemById(errorId);
+      clearActiveStates();
+      hideTooltip();
+      activeError = null;
+    }
+  
+    /* -------------------------------
+       APPLY / DISMISS FROM TOOLTIP
+    --------------------------------*/
+    document.addEventListener("click", (e) => {
+      const applyBtn = e.target.closest(".tooltip-portal .apply");
+      const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
+      if (!applyBtn && !dismissBtn) return;
+  
+      e.preventDefault();
+      e.stopPropagation();
+  
+      if (!activeError) return;
+  
+      const errorId = activeError.dataset.errorId || "";
+  
+      if (applyBtn) {
+        const suggestion = activeError.dataset.suggestion || "";
+        activeError.replaceWith(document.createTextNode(suggestion));
+  
+        appliedCorrections += 1;
+        sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
+      } else {
+        const original = activeError.dataset.original || "";
+        activeError.replaceWith(document.createTextNode(original));
+      }
+  
+      lastPlainText = getPlainText();
+      sessionStorage.setItem("tc_text", lastPlainText);
+      updateCounts(lastPlainText);
+  
+      if (errorId) removeSidebarItemById(errorId);
+  
+      hideTooltip();
+      activeError = null;
+      clearActiveStates();
+    }, true);
+  
+    /* -------------------------------
+       INIT
+    --------------------------------*/
+    const saved = sessionStorage.getItem("tc_text");
+    if (saved) {
+      lastPlainText = saved;
+      editor.innerHTML = htmlWithNewlines(saved);
+    }
+  
+    updateCounts(lastPlainText);
+    enforceLengthLimit(lastPlainText);
+    clearSuggestionsUI();
+    editor.focus();
+  
+    /* -------------------------------
+       INPUT
+    --------------------------------*/
+    editor.addEventListener("input", () => {
+      lastPlainText = getPlainText();
+      sessionStorage.setItem("tc_text", lastPlainText);
+      updateCounts(lastPlainText);
+  
+      // Editing resets free usage
       appliedCorrections = 0;
       sessionStorage.setItem("appliedCorrections", "0");
-
   
-    } catch (err) {
-      console.error("Submit error:", err);
-    } finally {
-      submit.disabled = false;
-      submit.classList.remove("is-loading");
-    }
-  });
+      // Clear stale suggestions when user edits
+      clearSuggestionsUI();
+      clearActiveStates();
+      hideTooltip();
+      activeError = null;
   
-
-
-})();
-
- </script>
+      enforceLengthLimit(lastPlainText);
+    });
+  
+    clearBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      editor.innerHTML = "";
+      lastPlainText = "";
+      sessionStorage.removeItem("tc_text");
+      updateCounts("");
+      enforceLengthLimit("");
+      clearSuggestionsUI();
+      clearActiveStates();
+      hideTooltip();
+      activeError = null;
+      editor.focus();
+    });
+  
+    /* -------------------------------
+       SUBMIT
+    --------------------------------*/
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+  
+      const text = lastPlainText.trim();
+      if (!text) return;
+  
+      // Hard stop on length
+      const wordCount = countWords(text);
+      if (wordCount > MAX_WORDS) {
+        enforceLengthLimit(text);
+        submit.classList.remove("is-loading");
+        return;
+      }
+  
+      submit.disabled = true;
+      submit.classList.add("is-loading");
+  
+      try {
+        const res = await fetch("/", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ text }),
+        });
+  
+        const data = await res.json();
+  
+        const diffs = getWordDiffs(data.original_text, data.corrected_text);
+  
+        editor.innerHTML = buildHighlightedHTML(data.original_text, diffs);
+  
+        // Render sidebar suggestions
+        renderSuggestions(diffs);
+  
+        lastPlainText = data.original_text;
+        sessionStorage.setItem("tc_text", lastPlainText);
+        updateCounts(lastPlainText);
+  
+        // Reset free correction counter on new result
+        appliedCorrections = 0;
+        sessionStorage.setItem("appliedCorrections", "0");
+  
+        clearActiveStates();
+        hideTooltip();
+        activeError = null;
+  
+      } catch (err) {
+        console.error("Submit error:", err);
+      } finally {
+        submit.disabled = false;
+        submit.classList.remove("is-loading");
+      }
+    });
+  })();
+  </script>
+  
 
 
 <script>
