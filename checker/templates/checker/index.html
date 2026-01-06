@@ -1221,6 +1221,189 @@ html, body {
   border-radius: 12px;
 }
 
+
+
+
+
+
+
+
+/* =========================
+   ✅ Modern tooltip popover
+========================= */
+.tooltip-portal{
+  position: fixed;
+  z-index: 1200;
+  display: none;
+  width: min(360px, calc(100vw - 20px));
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(2, 6, 23, 0.22);
+  padding: 12px;
+  transform-origin: top center;
+}
+
+.tooltip-portal.visible{
+  display: block;
+  animation: tcTipIn 140ms ease-out;
+}
+
+@keyframes tcTipIn{
+  from{ opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to{ opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Optional little “arrow” */
+.tooltip-portal::after{
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  transform: translateX(-50%) rotate(45deg);
+}
+.tooltip-portal.is-above::after{ bottom: -6px; }
+.tooltip-portal.is-below::after{ top: -6px; }
+
+/* Tooltip layout */
+.tooltip-portal .tc-tip{
+  display: grid;
+  gap: 10px;
+}
+
+.tooltip-portal .tc-tip__top{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tooltip-portal .tc-tip__close{
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: color-mix(in oklab, var(--text), #fff 35%);
+}
+.tooltip-portal .tc-tip__close:hover{
+  background: #f8fafc;
+}
+
+/* Badge */
+.tooltip-portal .tc-badge{
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .15px;
+  border: 1px solid transparent;
+}
+
+.tooltip-portal .tc-badge--serious{
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+.tooltip-portal .tc-badge--error{
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.tooltip-portal .tc-badge--improve{
+  color: #065f46;
+  background: rgba(5, 150, 105, 0.12);
+  border-color: rgba(5, 150, 105, 0.24);
+}
+
+/* Replacement row */
+.tooltip-portal .tc-tip__row{
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.tooltip-portal .tc-tip__from{
+  font-weight: 800;
+  color: #991b1b;
+}
+.tooltip-portal .tc-tip__arrow{
+  opacity: .6;
+}
+.tooltip-portal .tc-tip__to{
+  font-weight: 900;
+  color: #065f46;
+}
+
+/* Buttons */
+.tooltip-portal .tc-tip__actions{
+  display: flex;
+  gap: 10px;
+}
+
+.tooltip-portal .tc-tip__btn{
+  appearance: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tooltip-portal .tc-tip__btn:hover{
+  background: #f8fafc;
+}
+
+.tooltip-portal .tc-tip__btn--primary{
+  border-color: color-mix(in oklab, var(--accent), #fff 55%);
+  background: color-mix(in oklab, var(--accent), #fff 92%);
+  color: color-mix(in oklab, var(--accent), #000 22%);
+}
+
+/* =========================
+   ✅ Sidebar badge pill
+========================= */
+.s-pill{
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid transparent;
+  margin-bottom: 8px;
+}
+
+.s-pill--serious{
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.22);
+}
+.s-pill--error{
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+.s-pill--improve{
+  color: #065f46;
+  background: rgba(5, 150, 105, 0.12);
+  border-color: rgba(5, 150, 105, 0.22);
+}
+
+
  </style>
 
 
@@ -1495,49 +1678,78 @@ function restoreHighlightedState() {
     }
   
     function getWordDiffs(original, corrected) {
-      const oWords = tokenizeWords(original);
-      const cWords = tokenizeWords(corrected);
-  
-      const diffs = [];
-      const len = Math.min(oWords.length, cWords.length);
-  
-      for (let i = 0; i < len; i++) {
-        if (oWords[i].word !== cWords[i].word) {
-          diffs.push({
-            id: String(diffs.length),
-            start: oWords[i].start,
-            end: oWords[i].end,
-            original: oWords[i].word,
-            suggestion: cWords[i].word,
-          });
-        }
-      }
-      return diffs;
+  const oWords = tokenizeWords(original);
+  const cWords = tokenizeWords(corrected);
+
+  const diffs = [];
+  const len = Math.min(oWords.length, cWords.length);
+
+  for (let i = 0; i < len; i++) {
+    if (oWords[i].word !== cWords[i].word) {
+      const id = String(diffs.length);
+      const badge = pickBadge(oWords[i].word, cWords[i].word, id);
+
+      diffs.push({
+        id,
+        start: oWords[i].start,
+        end: oWords[i].end,
+        original: oWords[i].word,
+        suggestion: cWords[i].word,
+        badgeKey: badge.key,
+        badgeText: badge.text,
+      });
     }
+  }
+  return diffs;
+}
+
+
+    // ✅ Random-looking but stable badge per error (doesn't change each click)
+const BADGES = [
+  { key: "serious", text: "Alvorlig fejl" },
+  { key: "error",   text: "Fejl" },
+  { key: "improve", text: "Forbedring" },
+];
+
+function stableHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function pickBadge(original, suggestion, id) {
+  const idx = stableHash(`${id}|${original}|${suggestion}`) % BADGES.length;
+  return BADGES[idx];
+}
+
   
     /* -------------------------------
        RENDER HIGHLIGHTS
     --------------------------------*/
     function buildHighlightedHTML(text, diffs) {
-      if (!diffs.length) return htmlWithNewlines(text);
-  
-      let html = "";
-      let last = 0;
-  
-      for (const d of diffs) {
-        html += htmlWithNewlines(text.slice(last, d.start));
-        html += `<span class="error"
-          data-error-id="${escapeHTML(d.id)}"
-          data-original="${escapeHTML(d.original)}"
-          data-suggestion="${escapeHTML(d.suggestion)}"
-        >${escapeHTML(d.original)}</span>`;
-        last = d.end;
-      }
-  
-      html += htmlWithNewlines(text.slice(last));
-      return html;
-    }
-  
+  if (!diffs.length) return htmlWithNewlines(text);
+
+  let html = "";
+  let last = 0;
+
+  for (const d of diffs) {
+    html += htmlWithNewlines(text.slice(last, d.start));
+    html += `<span class="error"
+      data-error-id="${escapeHTML(d.id)}"
+      data-original="${escapeHTML(d.original)}"
+      data-suggestion="${escapeHTML(d.suggestion)}"
+      data-badge="${escapeHTML(d.badgeKey || "error")}"
+      data-badge-text="${escapeHTML(d.badgeText || "Fejl")}"
+    >${escapeHTML(d.original)}</span>`;
+    last = d.end;
+  }
+
+  html += htmlWithNewlines(text.slice(last));
+  return html;
+}
+
     /* -------------------------------
        SIDEBAR RENDER
     --------------------------------*/
@@ -1562,35 +1774,38 @@ function restoreHighlightedState() {
     }
   
     function renderSuggestions(diffs) {
-      if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
-  
-      suggestionsCount.textContent = String(diffs.length);
-  
-      if (!diffs.length) {
-        suggestionsList.innerHTML = "";
-        setSidebarEmpty("Ingen feil funnet 🎉");
-        return;
-      }
-  
-      hideSidebarEmpty();
-  
-      suggestionsList.innerHTML = diffs.map(d => `
-        <li class="s-item" data-error-id="${escapeHTML(d.id)}">
-          <button type="button" class="s-jump" data-jump>
-            <div class="s-line">
-              <span class="s-bad">${escapeHTML(d.original)}</span>
-              <span class="s-arrow">→</span>
-              <span class="s-good">${escapeHTML(d.suggestion)}</span>
-            </div>
-          </button>
-  
-          <div class="s-actions">
-            <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
-            <button type="button" class="s-btn" data-dismiss>Avvis</button>
-          </div>
-        </li>
-      `).join("");
-    }
+  if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
+
+  suggestionsCount.textContent = String(diffs.length);
+
+  if (!diffs.length) {
+    suggestionsList.innerHTML = "";
+    setSidebarEmpty("Ingen feil funnet 🎉");
+    return;
+  }
+
+  hideSidebarEmpty();
+
+  suggestionsList.innerHTML = diffs.map(d => `
+    <li class="s-item" data-error-id="${escapeHTML(d.id)}">
+      <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Fejl")}</div>
+
+      <button type="button" class="s-jump" data-jump>
+        <div class="s-line">
+          <span class="s-bad">${escapeHTML(d.original)}</span>
+          <span class="s-arrow">→</span>
+          <span class="s-good">${escapeHTML(d.suggestion)}</span>
+        </div>
+      </button>
+
+      <div class="s-actions">
+        <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+        <button type="button" class="s-btn" data-dismiss>Avvis</button>
+      </div>
+    </li>
+  `).join("");
+}
+
   
     function clearSuggestionsUI() {
   if (suggestionsList) suggestionsList.innerHTML = "";
@@ -1646,47 +1861,72 @@ function restoreHighlightedState() {
 }
 
   
-    function showTooltipForErrorSpan(errorSpan) {
-      if (!tooltip || !errorSpan) return;
-  
-      activeError = errorSpan;
-  
-      tooltip.innerHTML = `
-        <div class="suggestion">${escapeHTML(errorSpan.dataset.suggestion || "")}</div>
-        <div class="actions">
-          <button type="button" class="apply">Tillämpa</button>
-          <button type="button" class="dismiss">Avvisa</button>
-        </div>
-      `;
-  
-      // Force render to measure
-      tooltip.style.visibility = "hidden";
-      tooltip.style.display = "block";
-      tooltip.style.left = "0px";
-      tooltip.style.top = "0px";
-      tooltip.style.transform = "none";
-  
-      const wordRect = errorSpan.getBoundingClientRect();
-      const tipRect  = tooltip.getBoundingClientRect();
-  
-      const GAP = 12;
-      const PADDING = 8;
-  
-      let top = wordRect.top - tipRect.height - GAP;
-      if (top < PADDING) top = wordRect.bottom + GAP;
-  
-      let left = wordRect.left + wordRect.width / 2;
-      const minLeft = PADDING + tipRect.width / 2;
-      const maxLeft = window.innerWidth - PADDING - tipRect.width / 2;
-      left = Math.max(minLeft, Math.min(maxLeft, left));
-  
-      tooltip.style.top = `${top}px`;
-      tooltip.style.left = `${left}px`;
-      tooltip.style.transform = "translateX(-50%)";
-      tooltip.style.visibility = "visible";
-      tooltip.classList.add("visible");
-    }
-  
+function showTooltipForErrorSpan(errorSpan) {
+  if (!tooltip || !errorSpan) return;
+
+  activeError = errorSpan;
+
+  const orig = errorSpan.dataset.original || "";
+  const sugg = errorSpan.dataset.suggestion || "";
+  const badgeKey = errorSpan.dataset.badge || "error";
+  const badgeText = errorSpan.dataset.badgeText || "Fejl";
+
+  tooltip.innerHTML = `
+    <div class="tc-tip" role="dialog" aria-label="Forslag">
+      <div class="tc-tip__top">
+        <span class="tc-badge tc-badge--${escapeHTML(badgeKey)}">${escapeHTML(badgeText)}</span>
+        <button type="button" class="tc-tip__close" aria-label="Lukk">×</button>
+      </div>
+
+      <div class="tc-tip__row">
+        <span class="tc-tip__from">${escapeHTML(orig)}</span>
+        <span class="tc-tip__arrow" aria-hidden="true">→</span>
+        <span class="tc-tip__to">${escapeHTML(sugg)}</span>
+      </div>
+
+      <div class="tc-tip__actions">
+        <button type="button" class="tc-tip__btn tc-tip__btn--primary apply">Bruk</button>
+        <button type="button" class="tc-tip__btn dismiss">Avvis</button>
+      </div>
+    </div>
+  `;
+
+  // Prepare measure
+  tooltip.style.visibility = "hidden";
+  tooltip.style.display = "block";
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
+
+  const wordRect = errorSpan.getBoundingClientRect();
+  const tipRect  = tooltip.getBoundingClientRect();
+
+  const GAP = 12;
+  const PADDING = 8;
+
+  let top = wordRect.top - tipRect.height - GAP;
+  let isBelow = false;
+
+  if (top < PADDING) {
+    top = wordRect.bottom + GAP;
+    isBelow = true;
+  }
+
+  let left = wordRect.left + wordRect.width / 2;
+  const minLeft = PADDING + tipRect.width / 2;
+  const maxLeft = window.innerWidth - PADDING - tipRect.width / 2;
+  left = Math.max(minLeft, Math.min(maxLeft, left));
+
+  tooltip.classList.toggle("is-below", isBelow);
+  tooltip.classList.toggle("is-above", !isBelow);
+
+  tooltip.style.top = `${top}px`;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.transform = "translateX(-50%)";
+
+  tooltip.style.visibility = "visible";
+  tooltip.classList.add("visible");
+}
+
     /* -------------------------------
        CLICK IN EDITOR → TOOLTIP
     --------------------------------*/
@@ -1954,6 +2194,53 @@ editor.focus();
       }
     });
   })();
+
+
+  // ✅ Close tooltip on outside click / ESC / scroll / resize
+document.addEventListener("mousedown", (e) => {
+  if (!tooltip?.classList.contains("visible")) return;
+
+  const onTooltip = e.target.closest(".tooltip-portal");
+  const onError = e.target.closest("#text-editor .error");
+  if (!onTooltip && !onError) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+}, true);
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".tooltip-portal .tc-tip__close")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
+window.addEventListener("scroll", () => {
+  if (tooltip?.classList.contains("visible")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+}, { passive: true });
+
+window.addEventListener("resize", () => {
+  if (tooltip?.classList.contains("visible")) {
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+  }
+});
+
   </script>
   
 
