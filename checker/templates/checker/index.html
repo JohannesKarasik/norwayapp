@@ -1011,6 +1011,54 @@ html, body {
 
 
 
+/* =========================
+   WIDER MAIN LAYOUT (LESS SIDE WHITESPACE)
+   Paste at the VERY bottom of your <style>
+========================= */
+
+/* 1) Make the whole page container much wider */
+:root{
+  --page-max: 1700px;          /* adjust: 1400px–2000px */
+  --page-gutter: 24px;         /* side padding */
+}
+
+/* Your main outer container */
+.wrap{
+  width: min(var(--page-max), 96vw) !important;
+  max-width: var(--page-max) !important;
+  margin-inline: auto !important;
+  padding-inline: var(--page-gutter) !important;
+}
+
+/* Make the card stop being "narrow" */
+.card{
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: auto !important;
+}
+
+/* Slightly reduce the "boxed" feel (optional but helps fill screen) */
+.card__body{
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+/* 2) Give the editor + sidebar more room on wide screens */
+@media (min-width: 1100px){
+  .checker-layout{
+    grid-template-columns: minmax(0, 1fr) 420px; /* wider sidebar */
+    gap: 22px;
+  }
+}
+
+/* 3) Your SEO section currently limits line width (80ch).
+      This makes it use the new wider layout too. */
+@media (min-width: 1100px){
+  .seo.seo--rich p,
+  .seo.seo--rich ul{
+    max-width: none !important;
+  }
+}
 
 
  </style>
