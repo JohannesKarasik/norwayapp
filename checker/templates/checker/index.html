@@ -132,13 +132,14 @@
           </div>
 
           <div class="checker-sidebar__locked" id="suggestions-locked" hidden>
-            <p><strong>Logg inn for å se forslagene</strong></p>
-            <p>Opprett konto eller logg inn for å få full oversikt over feilene i teksten.</p>
+            <p><strong>Opprett konto for å se forslagene</strong></p>
+            <p>Du kan rette én feil gratis. Opprett konto for å fortsette.</p>
           
-            <button type="button" class="btn btn--primary" onclick="window.openAuthModal()">
-              Logg inn
+            <button type="button" class="btn btn--primary" onclick="window.openRegisterModal()">
+              Opprett konto
             </button>
           </div>
+          
           
 
           <ul class="checker-sidebar__list" id="suggestions-list"></ul>
@@ -1912,6 +1913,18 @@ function pickBadge(original, suggestion, id) {
   return true;
 }
 
+function gateIfNeededForHighlight() {
+  // Allow exactly ONE free interaction with a highlight
+  if (appliedCorrections >= 1 && !window.IS_AUTHENTICATED) {
+    persistHighlightedState();
+    lockSidebarForAuth();
+    window.openRegisterModal();
+    return false;
+  }
+  return true;
+}
+
+
 
 
   
@@ -1985,16 +1998,18 @@ function showTooltipForErrorSpan(errorSpan) {
        CLICK IN EDITOR → TOOLTIP
     --------------------------------*/
     editor.addEventListener("click", (e) => {
-      const error = e.target.closest(".error");
-      if (!error) return;
-  
-      if (!gateIfNeeded()) return;
-  
-      const id = error.dataset.errorId || "";
-      if (id) setActiveById(id);
-  
-      showTooltipForErrorSpan(error);
-    });
+  const error = e.target.closest(".error");
+  if (!error) return;
+
+  // 🔒 Gate highlight interaction after first free use
+  if (!gateIfNeededForHighlight()) return;
+
+  const id = error.dataset.errorId || "";
+  if (id) setActiveById(id);
+
+  showTooltipForErrorSpan(error);
+});
+
   
     /* -------------------------------
        SIDEBAR EVENTS (JUMP / APPLY / DISMISS)
