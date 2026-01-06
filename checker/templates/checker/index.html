@@ -1924,6 +1924,8 @@ function pickBadge(original, suggestion, id) {
   // Not logged in → register
   if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
+    sessionStorage.removeItem("tc_payment_gate_triggered");
+
     lockSidebarForAuth();
     window.openRegisterModal();
     return false;
@@ -2210,6 +2212,8 @@ editor.focus();
        INPUT
     --------------------------------*/
     editor.addEventListener("input", () => {
+      if (editor.dataset.rendering === "1") return;
+
       lastPlainText = getPlainText();
       sessionStorage.setItem("tc_text", lastPlainText);
       updateCounts(lastPlainText);
@@ -2228,11 +2232,8 @@ hideTooltip();
 activeError = null;
 
 unlockSidebar();
+enforceLengthLimit(lastPlainText);
 
-return true;
-
-  
-      enforceLengthLimit(lastPlainText);
     });
   
     clearBtn?.addEventListener("click", (e) => {
@@ -2284,7 +2285,10 @@ return true;
   
         const diffs = getWordDiffs(data.original_text, data.corrected_text);
   
-        editor.innerHTML = buildHighlightedHTML(data.original_text, diffs);
+        editor.dataset.rendering = "1";
+editor.innerHTML = buildHighlightedHTML(data.original_text, diffs);
+delete editor.dataset.rendering;
+
   
         // Render sidebar suggestions
         // Render sidebar suggestions
