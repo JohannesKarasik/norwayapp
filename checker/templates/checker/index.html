@@ -2007,14 +2007,27 @@ function gateIfNeededForHighlight() {
     return false;
   }
 
-  // ✅ Logged in but not paying: allow clicking highlights + opening tooltip.
-  // Payment gate happens ONLY on "Apply".
+  // 🔒 Logged in but NOT paying → payment modal (NO TOOLTIP)
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+    persistHighlightedState();
+    window.openPaymentModal();
+    return false;
+  }
+
+  // Paying user → allow tooltip
   return true;
 }
 
 
+
   
 function showTooltipForErrorSpan(errorSpan) {
+  // 🔒 Never show tooltip for unpaid users
+if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+  window.openPaymentModal();
+  return;
+}
+
   if (!tooltip || !errorSpan) return;
 
   activeError = errorSpan;
@@ -2084,6 +2097,12 @@ function showTooltipForErrorSpan(errorSpan) {
        CLICK IN EDITOR → TOOLTIP
     --------------------------------*/
     editor.addEventListener("click", (e) => {
+      // 🔒 Block tooltip clicks for unpaid users
+if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+  window.openPaymentModal();
+  return;
+}
+
   const error = e.target.closest(".error");
   if (!error) return;
 
