@@ -1799,6 +1799,8 @@ function restoreHighlightedState() {
   hideTooltip();
   activeError = null;
 
+
+  applyLockToUI();
   return true;
 }
 
@@ -2133,23 +2135,30 @@ function renderSuggestions(diffs) {
     }
 
     function gateIfNeededForApply() {
-  // ✅ Anonymous: allow FIRST apply free, gate on SECOND apply
+  // ✅ Anonymous: allow FIRST apply free, gate + BLUR on SECOND apply
   if (!window.IS_AUTHENTICATED) {
     if (appliedCorrections < 1) return true;
 
     persistHighlightedState();
-    setPendingLock("auth");          // blur only AFTER closing modal
-    window.openRegisterModal();      // show register on 2nd apply
+
+    // 🔒 lock immediately so sidebar/tooltip blurs while modal is open
+    sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
+    applyLockToUI();
+
+    window.openRegisterModal();
     return false;
   }
 
-  // ✅ Logged in but unpaid: allow FIRST apply free, gate on SECOND apply
+  // ✅ Logged in but unpaid: allow FIRST apply free, gate + BLUR on SECOND apply
   if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
     if (appliedCorrections < 1) return true;
 
     persistHighlightedState();
-    setPendingLock("pay");           // blur only AFTER closing modal
-    window.openPaymentModal();       // show payment on 2nd apply
+
+    sessionStorage.setItem(LOCK_KEYS.payLocked, "1");
+    applyLockToUI();
+
+    window.openPaymentModal();
     return false;
   }
 
@@ -2406,6 +2415,8 @@ if (!restored) {
   }
 
   updateCounts(lastPlainText);
+  persistHighlightedState();
+  applyLockToUI();
   enforceLengthLimit(lastPlainText);
   clearSuggestionsUI();
 } else {
