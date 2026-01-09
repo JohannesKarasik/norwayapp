@@ -2056,37 +2056,33 @@ function renderSuggestions(diffs) {
   if (!diffs.length) {
     suggestionsList.innerHTML = "";
     setSidebarEmpty("Ingen feil funnet 🎉");
+    if (suggestionsCount) suggestionsCount.textContent = "0";
     return;
   }
 
   hideSidebarEmpty();
 
-  // 🔒 Only lock (blur) for anonymous users
   const lockMode = getLockMode(); // "auth" | "pay" | null
-const isLocked = !!lockMode;
+  const isLocked = !!lockMode;
 
-const lockNote =
-  lockMode === "auth"
-    ? "Opprett konto for å låse opp forslaget"
-    : "Start gratis prøve for å låse opp forslaget";
+  const lockNote =
+    lockMode === "auth"
+      ? "Opprett konto for å låse opp forslaget"
+      : "Start gratis prøve for å låse opp forslaget";
 
   suggestionsList.innerHTML = diffs.map(d => `
-    <li class="s-item ${isAnonLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
+    <li class="s-item ${isLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
       <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Feil")}</div>
 
       <button type="button" class="s-jump" data-jump>
         <div class="s-line">
           <span class="s-bad">${escapeHTML(d.original)}</span>
           <span class="s-arrow">→</span>
-
-          <!-- ✅ wrap suggestion so we can blur ONLY the text -->
-          <span class="s-good">
-            <span class="s-good__text">${escapeHTML(d.suggestion)}</span>
-          </span>
+          <span class="s-good"><span class="s-good__text">${escapeHTML(d.suggestion)}</span></span>
         </div>
       </button>
 
-      ${isAnonLocked ? `<div class="s-locknote">Opprett konto for å låse opp forslaget</div>` : ""}
+      ${isLocked ? `<div class="s-locknote">${escapeHTML(lockNote)}</div>` : ""}
 
       <div class="s-actions">
         <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
@@ -2094,8 +2090,10 @@ const lockNote =
       </div>
     </li>
   `).join("");
-}
 
+  // Keep blur state consistent
+  applyLockToUI();
+}
 
   
     function clearSuggestionsUI() {
@@ -2179,12 +2177,7 @@ function gateIfNeededForHighlight() {
 
 
 
-  
 function showTooltipForErrorSpan(errorSpan) {
-  // 🔒 Never show tooltip for unpaid users
-
-}
-
   if (!tooltip || !errorSpan) return;
 
   activeError = errorSpan;
@@ -2204,11 +2197,11 @@ function showTooltipForErrorSpan(errorSpan) {
       <div class="tc-tip__row">
         <span class="tc-tip__from">${escapeHTML(orig)}</span>
         <span class="tc-tip__arrow" aria-hidden="true">→</span>
-${getLockMode()
-  ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
-  : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
-}
-
+        ${
+          getLockMode()
+            ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
+            : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
+        }
       </div>
 
       <div class="tc-tip__actions">
@@ -2253,6 +2246,7 @@ ${getLockMode()
   tooltip.style.visibility = "visible";
   tooltip.classList.add("visible");
 }
+
 
     /* -------------------------------
        CLICK IN EDITOR → TOOLTIP
@@ -2546,21 +2540,7 @@ if (!window.IS_AUTHENTICATED) {
 
 
 
-window.addEventListener("scroll", () => {
-  if (tooltip?.classList.contains("visible")) {
-    hideTooltip();
-    activeError = null;
-    clearActiveStates();
-  }
-}, { passive: true });
 
-window.addEventListener("resize", () => {
-  if (tooltip?.classList.contains("visible")) {
-    hideTooltip();
-    activeError = null;
-    clearActiveStates();
-  }
-});
 
   </script>
   
