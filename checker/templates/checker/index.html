@@ -1738,6 +1738,37 @@ function persistHighlightedState() {
   }
 }
 
+
+
+function resetAllCorrectionNumbersToZero() {
+  // Sidebar list + empty text
+  if (suggestionsList) suggestionsList.innerHTML = "";
+  setSidebarEmpty("Ingen feil igjen 🎉");
+
+  // Tekstkvalitet counts -> 0 (and keep panel visible if you want to show zeros)
+  if (qsSerious) qsSerious.textContent = "0";
+  if (qsSmall)   qsSmall.textContent = "0";
+  if (qsImprove) qsImprove.textContent = "0";
+
+  // Show the panel with zeros (optional)
+  if (qualityWrap) qualityWrap.hidden = false;
+
+  // Total suggestions -> 0
+  if (suggestionsCount) suggestionsCount.textContent = "0";
+}
+
+function maybeResetNumbersIfNoHighlightsLeft() {
+  const remainingHighlights = editor?.querySelectorAll(".error").length || 0;
+
+  if (remainingHighlights === 0) {
+    resetAllCorrectionNumbersToZero();
+    // Save the zero state so reload/login doesn't bring old numbers back
+    persistHighlightedState();
+  }
+}
+
+
+
 function clearHighlightedState() {
   try {
     Object.values(TC_STATE).forEach((k) => sessionStorage.removeItem(k));
@@ -2420,10 +2451,15 @@ if (e.target.closest("[data-dismiss]")) {
     });
   
     function removeSidebarItemById(errorId) {
-      const li = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
-      li?.remove();
-      updateSidebarCount();
-    }
+  const li = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
+  li?.remove();
+
+  updateSidebarCount();
+
+  // ✅ NEW: if no highlights remain, reset all numbers to 0
+  maybeResetNumbersIfNoHighlightsLeft();
+}
+
   
     function hideTooltip() {
       if (!tooltip) return;
@@ -2460,7 +2496,12 @@ if (e.target.closest("[data-dismiss]")) {
       hideTooltip();
       activeError = null;
 
+      // ✅ NEW: if last highlight is gone, reset numbers (also persists)
+      maybeResetNumbersIfNoHighlightsLeft();
+
+      // Keep persisting normal state too
       persistHighlightedState();
+
 
     }
   
@@ -2582,6 +2623,13 @@ sessionStorage.removeItem("tc_payment_gate_triggered");
 hideTooltip();
 activeError = null;
 
+// ✅ NEW: handle last correction finished
+maybeResetNumbersIfNoHighlightsLeft();
+
+// ✅ IMPORTANT: persist (your tooltip handler didn't before)
+persistHighlightedState();
+
+
 unlockSidebar();
 enforceLengthLimit(lastPlainText);
 
@@ -2645,9 +2693,13 @@ delete editor.dataset.rendering;
         // Render sidebar suggestions
         renderSuggestions(diffs);
 
-        // ✅ NEW: Show random "Tekstkvalitet" based on length of the text
-        showQualitySummaryForText(data.original_text);
-        syncTotalSuggestionsFromQuality();
+                // ✅ NEW: Show random "Tekstkvalitet" based on length of the text
+                if (diffs.length) {
+          showQualitySummaryForText(data.original_text);
+          syncTotalSuggestionsFromQuality();
+        } else {
+          resetAllCorrectionNumbersToZero();
+        }
 
 
         persistHighlightedState();
