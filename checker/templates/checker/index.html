@@ -1432,6 +1432,66 @@ html, body {
   margin-top: 12px;
 }
 
+
+
+/* =========================
+   🔒 Anonymous blur lock (sidebar + tooltip)
+========================= */
+
+.s-item.is-locked .s-good {
+  position: relative;
+}
+
+/* Blur ONLY the corrected (green) word */
+.s-item.is-locked .s-good__text {
+  filter: blur(6px);
+  opacity: 0.95;
+  user-select: none;
+}
+
+/* Subtle overlay to make it feel “pro” */
+.s-item.is-locked .s-good::after {
+  content: "";
+  position: absolute;
+  inset: -2px -4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+/* Small helper text under the row (optional but nice) */
+.s-locknote {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tooltip blur (so anon can’t see it there either) */
+.tc-tip__to--blur {
+  filter: blur(6px);
+  opacity: 0.95;
+  user-select: none;
+  position: relative;
+}
+
+.tc-tip__to--blur::after {
+  content: "";
+  position: absolute;
+  inset: -2px -4px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+
  </style>
 
 
@@ -1901,10 +1961,8 @@ function pickBadge(original, suggestion, id) {
 }
 
   
-    function renderSuggestions(diffs) {
+function renderSuggestions(diffs) {
   if (!suggestionsList || !suggestionsCount || !suggestionsEmpty) return;
-
-
 
   if (!diffs.length) {
     suggestionsList.innerHTML = "";
@@ -1914,17 +1972,26 @@ function pickBadge(original, suggestion, id) {
 
   hideSidebarEmpty();
 
+  // 🔒 Only lock (blur) for anonymous users
+  const isAnonLocked = !window.IS_AUTHENTICATED;
+
   suggestionsList.innerHTML = diffs.map(d => `
-    <li class="s-item" data-error-id="${escapeHTML(d.id)}">
-      <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Fejl")}</div>
+    <li class="s-item ${isAnonLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
+      <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Feil")}</div>
 
       <button type="button" class="s-jump" data-jump>
         <div class="s-line">
           <span class="s-bad">${escapeHTML(d.original)}</span>
           <span class="s-arrow">→</span>
-          <span class="s-good">${escapeHTML(d.suggestion)}</span>
+
+          <!-- ✅ wrap suggestion so we can blur ONLY the text -->
+          <span class="s-good">
+            <span class="s-good__text">${escapeHTML(d.suggestion)}</span>
+          </span>
         </div>
       </button>
+
+      ${isAnonLocked ? `<div class="s-locknote">Opprett konto for å låse opp forslaget</div>` : ""}
 
       <div class="s-actions">
         <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
@@ -1933,6 +2000,7 @@ function pickBadge(original, suggestion, id) {
     </li>
   `).join("");
 }
+
 
   
     function clearSuggestionsUI() {
@@ -1972,23 +2040,17 @@ function pickBadge(original, suggestion, id) {
     }
 
     function gateIfNeededForApply() {
-  // Not logged in → register
+  // Not logged in → open register (DO NOT clear/lock sidebar)
   if (!window.IS_AUTHENTICATED) {
     persistHighlightedState();
     sessionStorage.removeItem("tc_payment_gate_triggered");
-    lockSidebarForAuth();
     window.openRegisterModal();
     return false;
   }
 
-  // Logged in but NOT paying → show payment modal when they try to APPLY
+  // Logged in but NOT paying → payment modal when they try to APPLY
   if (!window.IS_PAYING) {
-    // (Optional) only show once per session
-    if (!hasTriggeredPaymentGate()) {
-      triggerPaymentGate();
-    }
-
-    // ✅ Keep highlights + sidebar visible (DO NOT clear/lock sidebar)
+    if (!hasTriggeredPaymentGate()) triggerPaymentGate();
     persistHighlightedState();
     window.openPaymentModal();
     return false;
@@ -1998,25 +2060,21 @@ function pickBadge(original, suggestion, id) {
 }
 
 
-function gateIfNeededForHighlight() {
-  // Not logged in → register
-  if (!window.IS_AUTHENTICATED) {
-    persistHighlightedState();
-    lockSidebarForAuth();
-    window.openRegisterModal();
-    return false;
-  }
 
-  // 🔒 Logged in but NOT paying → payment modal (NO TOOLTIP)
+function gateIfNeededForHighlight() {
+  // ✅ Anonymous users can view suggestions/highlights (apply is still gated)
+  if (!window.IS_AUTHENTICATED) return true;
+
+  // Logged in but NOT paying → keep your current paywall behavior
   if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
     persistHighlightedState();
     window.openPaymentModal();
     return false;
   }
 
-  // Paying user → allow tooltip
   return true;
 }
+
 
 
 
@@ -2047,7 +2105,10 @@ if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
       <div class="tc-tip__row">
         <span class="tc-tip__from">${escapeHTML(orig)}</span>
         <span class="tc-tip__arrow" aria-hidden="true">→</span>
-        <span class="tc-tip__to">${escapeHTML(sugg)}</span>
+${!window.IS_AUTHENTICATED
+  ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
+  : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
+}
       </div>
 
       <div class="tc-tip__actions">
