@@ -1861,17 +1861,26 @@ function clearLocks() {
   applyLockToUI();
 }
 
-// Adds/removes "is-locked" class on current sidebar items (no re-render needed)
 function applyLockToUI() {
   const mode = getLockMode(); // auth/pay/null
+
   const noteText =
     mode === "auth"
       ? "Opprett konto for å låse opp forslaget"
       : "Start gratis prøve for å låse opp forslaget";
 
+  const lockedBtnText =
+    mode === "auth"
+      ? "Create account to see corrections"
+      : "Start gratis prøve for å se korreksjoner";
+
+  const lockedBtnAttr =
+    mode === "auth" ? "data-unlock-auth" : "data-unlock-pay";
+
   suggestionsList?.querySelectorAll(".s-item").forEach((li) => {
     li.classList.toggle("is-locked", !!mode);
 
+    // lock note
     let note = li.querySelector(".s-locknote");
     if (mode) {
       if (!note) {
@@ -1883,15 +1892,51 @@ function applyLockToUI() {
     } else {
       note?.remove();
     }
+
+    // ✅ NEW: swap action buttons depending on lock mode
+    const actions = li.querySelector(".s-actions");
+    if (actions) {
+      if (mode) {
+        actions.innerHTML = `
+          <button type="button" class="s-btn s-btn--primary" ${lockedBtnAttr}>
+            ${escapeHTML(lockedBtnText)}
+          </button>
+        `;
+      } else {
+        actions.innerHTML = `
+          <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+          <button type="button" class="s-btn" data-dismiss>Avvis</button>
+        `;
+      }
+    }
   });
 
-  // If tooltip is open, blur/unblur the "to" text
+  // Tooltip blur/unblur
   const tp = window.__tcTooltip;
   const toEl = tp?.querySelector(".tc-tip__to");
   if (toEl) {
     toEl.classList.toggle("tc-tip__to--blur", !!mode);
   }
+
+  // ✅ NEW: swap tooltip buttons too (if tooltip is open)
+  const tpActions = tp?.querySelector(".tc-tip__actions");
+  if (tpActions) {
+    if (mode) {
+      const cls = mode === "auth" ? "unlock-auth" : "unlock-pay";
+      tpActions.innerHTML = `
+        <button type="button" class="tc-tip__btn tc-tip__btn--primary ${cls}">
+          ${escapeHTML(lockedBtnText)}
+        </button>
+      `;
+    } else {
+      tpActions.innerHTML = `
+        <button type="button" class="tc-tip__btn tc-tip__btn--primary apply">Bruk</button>
+        <button type="button" class="tc-tip__btn dismiss">Avvis</button>
+      `;
+    }
+  }
 }
+
 
 // Expose for modal close handlers (outside the IIFE)
 window.__tcApplyPendingLock = applyPendingLock;
@@ -2072,6 +2117,30 @@ function renderSuggestions(diffs) {
       ? "Opprett konto for å låse opp forslaget"
       : "Start gratis prøve for å låse opp forslaget";
 
+  // ✅ NEW: button label when blurred/locked
+  const lockedBtnText =
+    lockMode === "auth"
+      ? "Create account to see corrections"
+      : "Start gratis prøve for å se korreksjoner";
+
+  const lockedBtnAttr =
+    lockMode === "auth" ? "data-unlock-auth" : "data-unlock-pay";
+
+  const actionsLockedHTML = `
+    <div class="s-actions">
+      <button type="button" class="s-btn s-btn--primary" ${lockedBtnAttr}>
+        ${escapeHTML(lockedBtnText)}
+      </button>
+    </div>
+  `;
+
+  const actionsOpenHTML = `
+    <div class="s-actions">
+      <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+      <button type="button" class="s-btn" data-dismiss>Avvis</button>
+    </div>
+  `;
+
   suggestionsList.innerHTML = diffs.map(d => `
     <li class="s-item ${isLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
       <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Feil")}</div>
@@ -2086,10 +2155,7 @@ function renderSuggestions(diffs) {
 
       ${isLocked ? `<div class="s-locknote">${escapeHTML(lockNote)}</div>` : ""}
 
-      <div class="s-actions">
-        <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
-        <button type="button" class="s-btn" data-dismiss>Avvis</button>
-      </div>
+      ${isLocked ? actionsLockedHTML : actionsOpenHTML}
     </li>
   `).join("");
 
@@ -2196,29 +2262,51 @@ function showTooltipForErrorSpan(errorSpan) {
   const badgeKey = errorSpan.dataset.badge || "error";
   const badgeText = errorSpan.dataset.badgeText || "Feil";
 
-  tooltip.innerHTML = `
-    <div class="tc-tip" role="dialog" aria-label="Forslag">
-      <div class="tc-tip__top">
-        <span class="tc-badge tc-badge--${escapeHTML(badgeKey)}">${escapeHTML(badgeText)}</span>
-        <button type="button" class="tc-tip__close" aria-label="Lukk">×</button>
-      </div>
+  const lockMode = getLockMode();
+const ctaText =
+  lockMode === "auth"
+    ? "Create account to see corrections"
+    : "Start gratis prøve for å se korreksjoner";
+const ctaClass = lockMode === "auth" ? "unlock-auth" : "unlock-pay";
 
-      <div class="tc-tip__row">
-        <span class="tc-tip__from">${escapeHTML(orig)}</span>
-        <span class="tc-tip__arrow" aria-hidden="true">→</span>
-        ${
-          getLockMode()
-            ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
-            : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
-        }
-      </div>
-
-      <div class="tc-tip__actions">
-        <button type="button" class="tc-tip__btn tc-tip__btn--primary apply">Bruk</button>
-        <button type="button" class="tc-tip__btn dismiss">Avvis</button>
-      </div>
+tooltip.innerHTML = `
+  <div class="tc-tip" role="dialog" aria-label="Forslag">
+    <div class="tc-tip__top">
+      <span class="tc-badge tc-badge--${escapeHTML(badgeKey)}">
+        ${escapeHTML(badgeText)}
+      </span>
+      <button type="button" class="tc-tip__close" aria-label="Lukk">×</button>
     </div>
-  `;
+
+    <div class="tc-tip__row">
+      <span class="tc-tip__from">${escapeHTML(orig)}</span>
+      <span class="tc-tip__arrow">→</span>
+      ${
+        lockMode
+          ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
+          : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
+      }
+    </div>
+
+    <div class="tc-tip__actions">
+      ${
+        lockMode
+          ? `<button type="button"
+                     class="tc-tip__btn tc-tip__btn--primary ${ctaClass}">
+               ${escapeHTML(ctaText)}
+             </button>`
+          : `<button type="button"
+                     class="tc-tip__btn tc-tip__btn--primary apply">
+               Bruk
+             </button>
+             <button type="button"
+                     class="tc-tip__btn dismiss">
+               Avvis
+             </button>`
+      }
+    </div>
+  </div>
+`;
 
   // Prepare measure
   tooltip.style.visibility = "hidden";
@@ -2287,6 +2375,33 @@ function showTooltipForErrorSpan(errorSpan) {
       const errorId = item.dataset.errorId || "";
       if (!errorId) return;
   
+      // ✅ NEW: Locked CTA buttons (blur mode)
+      if (e.target.closest("[data-unlock-auth]")) {
+        persistHighlightedState();
+        sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
+        applyLockToUI();
+        hideTooltip();
+        activeError = null;
+        clearActiveStates();
+        window.openRegisterModal();
+        return;
+      }
+
+      if (e.target.closest("[data-unlock-pay]")) {
+        persistHighlightedState();
+        sessionStorage.setItem(LOCK_KEYS.payLocked, "1");
+        applyLockToUI();
+        hideTooltip();
+        activeError = null;
+        clearActiveStates();
+        window.openPaymentModal();
+        return;
+      }
+
+
+
+
+
       // Jump
       if (e.target.closest("[data-jump]")) {
   
@@ -2366,42 +2481,72 @@ if (e.target.closest("[data-dismiss]")) {
     /* -------------------------------
        APPLY / DISMISS FROM TOOLTIP
     --------------------------------*/
-    document.addEventListener("click", (e) => {
-      const applyBtn = e.target.closest(".tooltip-portal .apply");
-      const dismissBtn = e.target.closest(".tooltip-portal .dismiss");
-      if (!applyBtn && !dismissBtn) return;
-  
-      e.preventDefault();
-      e.stopPropagation();
-  
-      if (!activeError) return;
-  
-      const errorId = activeError.dataset.errorId || "";
-  
-      if (applyBtn) {
-  if (!gateIfNeededForApply()) return;
+/* -------------------------------
+   APPLY / DISMISS / UNLOCK FROM TOOLTIP
+--------------------------------*/
+document.addEventListener("click", (e) => {
+  const unlockAuthBtn = e.target.closest(".tooltip-portal .unlock-auth");
+  const unlockPayBtn  = e.target.closest(".tooltip-portal .unlock-pay");
+  const applyBtn      = e.target.closest(".tooltip-portal .apply");
+  const dismissBtn    = e.target.closest(".tooltip-portal .dismiss");
 
-  const suggestion = activeError.dataset.suggestion || "";
-  activeError.replaceWith(document.createTextNode(suggestion));
+  if (!unlockAuthBtn && !unlockPayBtn && !applyBtn && !dismissBtn) return;
 
-  appliedCorrections += 1;
-  sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
-      } else {
-        const original = activeError.dataset.original || "";
-        activeError.replaceWith(document.createTextNode(original));
-      }
-  
-      lastPlainText = getPlainText();
-      sessionStorage.setItem("tc_text", lastPlainText);
-      updateCounts(lastPlainText);
-  
-      if (errorId) removeSidebarItemById(errorId);
-  
-      hideTooltip();
-      activeError = null;
-      clearActiveStates();
-    }, true);
-  
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 🔓 CTA → Register
+  if (unlockAuthBtn) {
+    persistHighlightedState();
+    sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
+    applyLockToUI();
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+    window.openRegisterModal();
+    return;
+  }
+
+  // 💳 CTA → Payment
+  if (unlockPayBtn) {
+    persistHighlightedState();
+    sessionStorage.setItem(LOCK_KEYS.payLocked, "1");
+    applyLockToUI();
+    hideTooltip();
+    activeError = null;
+    clearActiveStates();
+    window.openPaymentModal();
+    return;
+  }
+
+  if (!activeError) return;
+
+  const errorId = activeError.dataset.errorId || "";
+
+  if (applyBtn) {
+    if (!gateIfNeededForApply()) return;
+
+    const suggestion = activeError.dataset.suggestion || "";
+    activeError.replaceWith(document.createTextNode(suggestion));
+
+    appliedCorrections += 1;
+    sessionStorage.setItem("appliedCorrections", appliedCorrections.toString());
+  } else {
+    const original = activeError.dataset.original || "";
+    activeError.replaceWith(document.createTextNode(original));
+  }
+
+  lastPlainText = getPlainText();
+  sessionStorage.setItem("tc_text", lastPlainText);
+  updateCounts(lastPlainText);
+
+  if (errorId) removeSidebarItemById(errorId);
+
+  hideTooltip();
+  activeError = null;
+  clearActiveStates();
+}, true);
+
     /* -------------------------------
        INIT
     --------------------------------*/
