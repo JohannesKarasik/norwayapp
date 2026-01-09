@@ -1807,6 +1807,95 @@ function restoreHighlightedState() {
     let appliedCorrections = Number(
       sessionStorage.getItem("appliedCorrections") || 0
     );
+
+    // ===============================
+// 🔒 Progressive lock after 1 free correction
+// ===============================
+const LOCK_KEYS = {
+  authLocked: "tc_auth_locked",   // blur after closing auth modal
+  payLocked:  "tc_pay_locked",    // blur after closing pay modal
+  pending:    "tc_lock_pending",  // "auth" | "pay"
+};
+
+// If user is already unlocked, clear any stale locks
+if (window.IS_AUTHENTICATED) sessionStorage.removeItem(LOCK_KEYS.authLocked);
+if (window.IS_PAYING)        sessionStorage.removeItem(LOCK_KEYS.payLocked);
+
+function isAuthLocked() {
+  return sessionStorage.getItem(LOCK_KEYS.authLocked) === "1";
+}
+function isPayLocked() {
+  return sessionStorage.getItem(LOCK_KEYS.payLocked) === "1";
+}
+
+// Returns: "auth" | "pay" | null
+function getLockMode() {
+  if (!window.IS_AUTHENTICATED) return isAuthLocked() ? "auth" : null;
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) return isPayLocked() ? "pay" : null;
+  return null;
+}
+
+function setPendingLock(kind) {
+  sessionStorage.setItem(LOCK_KEYS.pending, kind);
+}
+
+function applyPendingLock() {
+  const kind = sessionStorage.getItem(LOCK_KEYS.pending);
+  sessionStorage.removeItem(LOCK_KEYS.pending);
+
+  if (kind === "auth" && !window.IS_AUTHENTICATED) {
+    sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
+  }
+  if (kind === "pay" && window.IS_AUTHENTICATED && !window.IS_PAYING) {
+    sessionStorage.setItem(LOCK_KEYS.payLocked, "1");
+  }
+  applyLockToUI();
+}
+
+function clearLocks() {
+  sessionStorage.removeItem(LOCK_KEYS.authLocked);
+  sessionStorage.removeItem(LOCK_KEYS.payLocked);
+  sessionStorage.removeItem(LOCK_KEYS.pending);
+  applyLockToUI();
+}
+
+// Adds/removes "is-locked" class on current sidebar items (no re-render needed)
+function applyLockToUI() {
+  const mode = getLockMode(); // auth/pay/null
+  const noteText =
+    mode === "auth"
+      ? "Opprett konto for å låse opp forslaget"
+      : "Start gratis prøve for å låse opp forslaget";
+
+  suggestionsList?.querySelectorAll(".s-item").forEach((li) => {
+    li.classList.toggle("is-locked", !!mode);
+
+    let note = li.querySelector(".s-locknote");
+    if (mode) {
+      if (!note) {
+        note = document.createElement("div");
+        note.className = "s-locknote";
+        li.insertBefore(note, li.querySelector(".s-actions"));
+      }
+      note.textContent = noteText;
+    } else {
+      note?.remove();
+    }
+  });
+
+  // If tooltip is open, blur/unblur the "to" text
+  const tp = window.__tcTooltip;
+  const toEl = tp?.querySelector(".tc-tip__to");
+  if (toEl) {
+    toEl.classList.toggle("tc-tip__to--blur", !!mode);
+  }
+}
+
+// Expose for modal close handlers (outside the IIFE)
+window.__tcApplyPendingLock = applyPendingLock;
+window.__tcClearLocks = clearLocks;
+window.__tcApplyLockToUI = applyLockToUI;
+
   
     /* -------------------------------
        TEXT HELPERS
@@ -1973,7 +2062,13 @@ function renderSuggestions(diffs) {
   hideSidebarEmpty();
 
   // 🔒 Only lock (blur) for anonymous users
-  const isAnonLocked = !window.IS_AUTHENTICATED;
+  const lockMode = getLockMode(); // "auth" | "pay" | null
+const isLocked = !!lockMode;
+
+const lockNote =
+  lockMode === "auth"
+    ? "Opprett konto for å låse opp forslaget"
+    : "Start gratis prøve for å låse opp forslaget";
 
   suggestionsList.innerHTML = diffs.map(d => `
     <li class="s-item ${isAnonLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
@@ -2040,24 +2135,30 @@ function renderSuggestions(diffs) {
     }
 
     function gateIfNeededForApply() {
-  // Not logged in → open register (DO NOT clear/lock sidebar)
+  // ✅ Anonymous: allow FIRST apply free, gate on SECOND apply
   if (!window.IS_AUTHENTICATED) {
+    if (appliedCorrections < 1) return true;
+
     persistHighlightedState();
-    sessionStorage.removeItem("tc_payment_gate_triggered");
-    window.openRegisterModal();
+    setPendingLock("auth");          // blur only AFTER closing modal
+    window.openRegisterModal();      // show register on 2nd apply
     return false;
   }
 
-  // Logged in but NOT paying → payment modal when they try to APPLY
-  if (!window.IS_PAYING) {
-    if (!hasTriggeredPaymentGate()) triggerPaymentGate();
+  // ✅ Logged in but unpaid: allow FIRST apply free, gate on SECOND apply
+  if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
+    if (appliedCorrections < 1) return true;
+
     persistHighlightedState();
-    window.openPaymentModal();
+    setPendingLock("pay");           // blur only AFTER closing modal
+    window.openPaymentModal();       // show payment on 2nd apply
     return false;
   }
 
+  // ✅ Paying: no gate
   return true;
 }
+
 
 
 
@@ -2081,9 +2182,7 @@ function gateIfNeededForHighlight() {
   
 function showTooltipForErrorSpan(errorSpan) {
   // 🔒 Never show tooltip for unpaid users
-if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-  window.openPaymentModal();
-  return;
+
 }
 
   if (!tooltip || !errorSpan) return;
@@ -2105,10 +2204,11 @@ if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
       <div class="tc-tip__row">
         <span class="tc-tip__from">${escapeHTML(orig)}</span>
         <span class="tc-tip__arrow" aria-hidden="true">→</span>
-${!window.IS_AUTHENTICATED
+${getLockMode()
   ? `<span class="tc-tip__to tc-tip__to--blur">${escapeHTML(sugg)}</span>`
   : `<span class="tc-tip__to">${escapeHTML(sugg)}</span>`
 }
+
       </div>
 
       <div class="tc-tip__actions">
@@ -2159,10 +2259,7 @@ ${!window.IS_AUTHENTICATED
     --------------------------------*/
     editor.addEventListener("click", (e) => {
       // 🔒 Block tooltip clicks for unpaid users
-if (window.IS_AUTHENTICATED && !window.IS_PAYING) {
-  window.openPaymentModal();
-  return;
-}
+
 
   const error = e.target.closest(".error");
   if (!error) return;
