@@ -1864,10 +1864,6 @@ function clearLocks() {
 function applyLockToUI() {
   const mode = getLockMode(); // auth/pay/null
 
-  const noteText =
-    mode === "auth"
-      ? "Opprett konto for å låse opp forslaget"
-      : "Start gratis prøve for å låse opp forslaget";
 
   const lockedBtnText =
     mode === "auth"
