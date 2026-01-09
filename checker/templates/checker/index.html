@@ -2112,10 +2112,7 @@ function renderSuggestions(diffs) {
   const lockMode = getLockMode(); // "auth" | "pay" | null
   const isLocked = !!lockMode;
 
-  const lockNote =
-    lockMode === "auth"
-      ? "Opprett konto for å låse opp forslaget"
-      : "Start gratis prøve for å låse opp forslaget";
+
 
   // ✅ NEW: button label when blurred/locked
   const lockedBtnText =
