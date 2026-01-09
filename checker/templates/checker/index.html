@@ -1881,17 +1881,7 @@ function applyLockToUI() {
     li.classList.toggle("is-locked", !!mode);
 
     // lock note
-    let note = li.querySelector(".s-locknote");
-    if (mode) {
-      if (!note) {
-        note = document.createElement("div");
-        note.className = "s-locknote";
-        li.insertBefore(note, li.querySelector(".s-actions"));
-      }
-      note.textContent = noteText;
-    } else {
-      note?.remove();
-    }
+   
 
     // ✅ NEW: swap action buttons depending on lock mode
     const actions = li.querySelector(".s-actions");
