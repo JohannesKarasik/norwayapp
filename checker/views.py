@@ -921,7 +921,7 @@ def create_checkout_session(request):
                 "trial_period_days": 30,
             },
 
-            success_url=request.build_absolute_uri("/"),
+            success_url=request.build_absolute_uri("/?checkout=success"),
             cancel_url=request.build_absolute_uri("/"),
 
             # ✅ Promo/coupon box removed
