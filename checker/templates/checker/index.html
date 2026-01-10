@@ -1593,6 +1593,19 @@ function hasTriggeredPaymentGate() {
   return sessionStorage.getItem("tc_payment_gate_triggered") === "1";
 }
 
+function forceCloseTooltip() {
+    const tp = window.__tcTooltip;
+    if (!tp) return;
+
+    tp.classList.remove("visible");
+    tp.style.display = "none";
+    tp.style.visibility = "hidden";
+    tp.innerHTML = "";
+
+    // also clear active state
+    window.activeError = null;
+  }
+
 function triggerPaymentGate() {
   sessionStorage.setItem("tc_payment_gate_triggered", "1");
 }
@@ -2759,10 +2772,12 @@ if (!window.IS_AUTHENTICATED) {
  
  
   function openAuthModal(){
-    authModal.classList.add("active");
-    authModal.setAttribute("aria-hidden", "false");
-  }
- 
+  forceCloseTooltip();
+
+  authModal.classList.add("active");
+  authModal.setAttribute("aria-hidden", "false");
+}
+
  
   function closeAuthModal(){
     authModal.classList.remove("active");
@@ -2771,11 +2786,14 @@ if (!window.IS_AUTHENTICATED) {
  
  
   function openRegisterModal(){
+  // ✅ FORCE-CLOSE TOOLTIP FIRST
+  forceCloseTooltip();
+
   closeAuthModal();
   registerModal.classList.add("active");
   registerModal.setAttribute("aria-hidden", "false");
- }
- 
+}
+
  
   function closeRegisterModal(){
     registerModal.classList.remove("active");
