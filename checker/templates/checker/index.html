@@ -2238,11 +2238,27 @@ function renderSuggestions(diffs) {
     persistHighlightedState();
 
     // 🔒 lock immediately so sidebar/tooltip blurs while modal is open
-    sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
-    applyLockToUI();
+    persistHighlightedState();
 
+// ⛔ DO NOT lock yet
+    setPendingLock("auth");
+
+    // ✅ open modal
     window.openRegisterModal();
     return false;
+
+    registerClose?.addEventListener("click", () => {
+  closeRegisterModal();
+  window.__tcApplyPendingLock?.();
+});
+
+registerModal?.querySelector(".modal__overlay")
+  ?.addEventListener("click", () => {
+    closeRegisterModal();
+    window.__tcApplyPendingLock?.();
+  });
+
+
   }
 
   // ✅ Logged in but unpaid: allow FIRST apply free, gate + BLUR on SECOND apply
