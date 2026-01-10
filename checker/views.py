@@ -935,6 +935,9 @@ def create_checkout_session(request):
             {"error": str(e)},
             status=400
         )
+    
+
+
 
 
 from django.contrib.auth.models import User

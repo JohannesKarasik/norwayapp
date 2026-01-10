@@ -2912,12 +2912,27 @@ if (!window.IS_AUTHENTICATED) {
 
   
 <script>
-  const params = new URLSearchParams(window.location.search);
+  (function () {
+    const params = new URLSearchParams(window.location.search);
 
-  if (params.get("checkout") === "success") {
-    // Temporary unlock until webhook updates DB
-    window.IS_PAYING = true;
+    if (
+      params.get("checkout") === "success" &&
+      !sessionStorage.getItem("ads_subscribe_fired")
+    ) {
+      // Prevent double firing
+      sessionStorage.setItem("ads_subscribe_fired", "1");
 
-    // Clean URL
-  }
+      // Temporary unlock until webhook updates DB
+      window.IS_PAYING = true;
+
+      // ✅ Google Ads conversion
+      if (typeof gtag === "function") {
+        gtag('event', 'conversion_event_subscribe_paid');
+      }
+
+      // Clean URL (SEO + UX)
+      history.replaceState({}, "", "/");
+    }
+  })();
 </script>
+
