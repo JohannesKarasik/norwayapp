@@ -1594,17 +1594,20 @@ function hasTriggeredPaymentGate() {
 }
 
 function forceCloseTooltip() {
-    const tp = window.__tcTooltip;
-    if (!tp) return;
+  const tp = window.__tcTooltip;
+  if (!tp) return;
 
-    tp.classList.remove("visible");
-    tp.style.display = "none";
-    tp.style.visibility = "hidden";
-    tp.innerHTML = "";
+  tp.classList.remove("visible");
+  tp.style.display = "none";
+  tp.style.visibility = "hidden";
+  tp.innerHTML = "";
 
-    // also clear active state
-    window.activeError = null;
-  }
+  window.activeError = null;
+}
+
+// ✅ expose globally
+window.forceCloseTooltip = forceCloseTooltip;
+
 
 function triggerPaymentGate() {
   sessionStorage.setItem("tc_payment_gate_triggered", "1");
