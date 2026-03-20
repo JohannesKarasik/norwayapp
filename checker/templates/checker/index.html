@@ -2184,23 +2184,22 @@ function renderSuggestions(diffs) {
           </div>
         </button>
 
-        ${
-          isLocked
-            ? `
-              <div class="s-locknote">Opprett konto for å se denne feilen</div>
-              <div class="s-actions">
-                <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
-                  Opprett konto for å se alle feilene
-                </button>
-              </div>
-            `
-            : `
-              <div class="s-actions">
-                <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
-                <button type="button" class="s-btn" data-dismiss>Avvis</button>
-              </div>
-            `
-        }
+${
+  isLocked
+    ? `
+      <div class="s-actions">
+        <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
+          Opprett konto for å se alle feilene
+        </button>
+      </div>
+    `
+    : `
+      <div class="s-actions">
+        <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+        <button type="button" class="s-btn" data-dismiss>Avvis</button>
+      </div>
+    `
+}
       </li>
     `;
   }).join("");
