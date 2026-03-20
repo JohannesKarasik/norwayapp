@@ -1938,8 +1938,12 @@ function applyPreviewLockToExistingSidebar() {
     if (actions) {
       if (isPreviewLocked) {
         actions.innerHTML = `
-          <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
-            Opprett konto for å se alle feilene
+          <button
+            type="button"
+            class="s-btn s-btn--primary"
+            ${window.IS_AUTHENTICATED ? 'data-unlock-pay' : 'data-unlock-preview'}
+          >
+            ${window.IS_AUTHENTICATED ? 'Start gratis prøve for å se alle feilene' : 'Opprett konto for å se alle feilene'}
           </button>
         `;
       } else {
@@ -2215,8 +2219,12 @@ ${
   isLocked
     ? `
       <div class="s-actions">
-        <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
-          Opprett konto for å se alle feilene
+        <button
+          type="button"
+          class="s-btn s-btn--primary"
+          ${window.IS_AUTHENTICATED ? 'data-unlock-pay' : 'data-unlock-preview'}
+        >
+          ${window.IS_AUTHENTICATED ? 'Start gratis prøve for å se alle feilene' : 'Opprett konto for å se alle feilene'}
         </button>
       </div>
     `
@@ -2460,14 +2468,23 @@ tooltip.innerHTML = `
   if (!item) return;
 
   if (e.target.closest("[data-unlock-preview]")) {
-    window.openRegisterModal();
-    return;
-  }
+  window.openRegisterModal();
+  return;
+}
 
-  if (item.classList.contains("is-locked")) {
+if (e.target.closest("[data-unlock-pay]")) {
+  window.openPaymentModal();
+  return;
+}
+
+if (item.classList.contains("is-locked")) {
+  if (window.IS_AUTHENTICATED) {
+    window.openPaymentModal();
+  } else {
     window.openRegisterModal();
-    return;
   }
+  return;
+}
 
   const errorId = item.dataset.errorId || "";
   if (!errorId) return;
