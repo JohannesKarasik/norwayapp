@@ -2471,9 +2471,8 @@ tooltip.innerHTML = `
     return;
   }
 });
-    });
-  
-    function removeSidebarItemById(errorId) {
+
+function removeSidebarItemById(errorId) {
   const li = suggestionsList?.querySelector(`.s-item[data-error-id="${CSS.escape(errorId)}"]`);
   li?.remove();
 
