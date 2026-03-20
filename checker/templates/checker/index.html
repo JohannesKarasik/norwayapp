@@ -1442,16 +1442,18 @@ html, body {
   position: relative;
 }
 
+.s-item.is-locked .s-pill,
 .s-item.is-locked .s-bad,
-.s-item.is-locked .s-good__text,
-.s-item.is-locked .s-pill {
+.s-item.is-locked .s-arrow,
+.s-item.is-locked .s-good__text {
   filter: blur(6px);
   user-select: none;
   pointer-events: none;
 }
 
 .s-item.is-locked .s-jump {
-  cursor: default;
+  position: relative;
+  cursor: pointer;
 }
 
 .s-item.is-locked .s-jump::after {
@@ -1459,7 +1461,7 @@ html, body {
   position: absolute;
   inset: 0;
   border-radius: 10px;
-  background: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.25);
   pointer-events: none;
 }
 
@@ -1512,7 +1514,7 @@ document.addEventListener("mousedown", (e) => {
 
   const onTooltip = e.target.closest(".tooltip-portal");
   const onError = e.target.closest("#text-editor .error");
-  const FREE_PREVIEW_LIMIT = 3;
+
 
   if (!onTooltip && !onError) {
     hideTooltip();
@@ -1559,6 +1561,7 @@ window.addEventListener("resize", () => {
     });
   
     const MAX_WORDS = 800;
+    const FREE_PREVIEW_LIMIT = 3;
   
     function countWords(text) {
       return (text.trim().match(/\S+/g) || []).length;
@@ -2133,7 +2136,13 @@ function pickBadge(original, suggestion, id) {
     }
   
     function updateSidebarCount() {
-  syncTotalSuggestionsFromQuality();
+  const count = suggestionsList
+    ? suggestionsList.querySelectorAll(".s-item").length
+    : 0;
+
+  if (suggestionsCount) {
+    suggestionsCount.textContent = String(count);
+  }
 }
 
   
@@ -2143,38 +2152,29 @@ function renderSuggestions(diffs) {
   if (!diffs.length) {
     suggestionsList.innerHTML = "";
     setSidebarEmpty("Ingen feil funnet 🎉");
-    if (suggestionsCount) suggestionsCount.textContent = "0";
+    suggestionsCount.textContent = "0";
     return;
   }
 
   hideSidebarEmpty();
 
-  const isPaidUser = !!window.IS_PAYING;
-  const shouldPreviewLock = !isPaidUser;
+  const shouldPreviewLock = !window.IS_PAYING;
 
   suggestionsList.innerHTML = diffs.map((d, index) => {
     const isLocked = shouldPreviewLock && index >= FREE_PREVIEW_LIMIT;
 
-    const actionsHTML = isLocked
-      ? `
-        <div class="s-actions">
-          <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
-            Opprett konto for å se alle feilene
-          </button>
-        </div>
-      `
-      : `
-        <div class="s-actions">
-          <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
-          <button type="button" class="s-btn" data-dismiss>Avvis</button>
-        </div>
-      `;
-
     return `
       <li class="s-item ${isLocked ? "is-locked" : ""}" data-error-id="${escapeHTML(d.id)}">
-        <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">${escapeHTML(d.badgeText || "Feil")}</div>
+        <div class="s-pill s-pill--${escapeHTML(d.badgeKey || "error")}">
+          ${escapeHTML(d.badgeText || "Feil")}
+        </div>
 
-        <button type="button" class="s-jump" data-jump ${isLocked ? 'disabled aria-disabled="true"' : ""}>
+        <button
+          type="button"
+          class="s-jump"
+          data-jump
+          ${isLocked ? 'data-preview-locked="true"' : ""}
+        >
           <div class="s-line">
             <span class="s-bad">${escapeHTML(d.original)}</span>
             <span class="s-arrow">→</span>
@@ -2186,11 +2186,21 @@ function renderSuggestions(diffs) {
 
         ${
           isLocked
-            ? `<div class="s-locknote">Opprett konto for å se denne feilen</div>`
-            : ``
+            ? `
+              <div class="s-locknote">Opprett konto for å se denne feilen</div>
+              <div class="s-actions">
+                <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
+                  Opprett konto for å se alle feilene
+                </button>
+              </div>
+            `
+            : `
+              <div class="s-actions">
+                <button type="button" class="s-btn s-btn--primary" data-apply>Bruk</button>
+                <button type="button" class="s-btn" data-dismiss>Avvis</button>
+              </div>
+            `
         }
-
-        ${actionsHTML}
       </li>
     `;
   }).join("");
@@ -2420,80 +2430,47 @@ tooltip.innerHTML = `
        SIDEBAR EVENTS (JUMP / APPLY / DISMISS)
     --------------------------------*/
     suggestionsList?.addEventListener("click", (e) => {
-      const item = e.target.closest(".s-item");
-      if (!item) return;
+  const item = e.target.closest(".s-item");
+  if (!item) return;
 
-      if (e.target.closest("[data-unlock-preview]")) {
+  if (e.target.closest("[data-unlock-preview]")) {
     window.openRegisterModal();
     return;
   }
 
   if (item.classList.contains("is-locked")) {
-    if (e.target.closest("[data-jump]")) {
-      window.openRegisterModal();
-    }
+    window.openRegisterModal();
     return;
   }
-  
-      const errorId = item.dataset.errorId || "";
-      if (!errorId) return;
-  
-      // ✅ NEW: Locked CTA buttons (blur mode)
-      if (e.target.closest("[data-unlock-auth]")) {
-        persistHighlightedState();
-        sessionStorage.setItem(LOCK_KEYS.authLocked, "1");
-        applyLockToUI();
-        hideTooltip();
-        activeError = null;
-        clearActiveStates();
-        window.openRegisterModal();
-        return;
-      }
 
-      if (e.target.closest("[data-unlock-pay]")) {
-        persistHighlightedState();
-        sessionStorage.setItem(LOCK_KEYS.payLocked, "1");
-        applyLockToUI();
-        hideTooltip();
-        activeError = null;
-        clearActiveStates();
-        window.openPaymentModal();
-        return;
-      }
+  const errorId = item.dataset.errorId || "";
+  if (!errorId) return;
 
+  if (e.target.closest("[data-jump]")) {
+    const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
+    if (!span) {
+      item.remove();
+      updateSidebarCount();
+      return;
+    }
 
+    setActiveById(errorId);
+    span.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    showTooltipForErrorSpan(span);
+    return;
+  }
 
+  if (e.target.closest("[data-apply]")) {
+    if (!gateIfNeededForApply()) return;
+    applyOrDismissById(errorId, "apply");
+    return;
+  }
 
-
-      // Jump
-      if (e.target.closest("[data-jump]")) {
-  
-        const span = editor.querySelector(`.error[data-error-id="${CSS.escape(errorId)}"]`);
-        if (!span) {
-          // already applied/dismissed
-          item.remove();
-          updateSidebarCount();
-          return;
-        }
-  
-        setActiveById(errorId);
-        span.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-        showTooltipForErrorSpan(span);
-        return;
-      }
-  
-      if (e.target.closest("[data-apply]")) {
-  if (!gateIfNeededForApply()) return;
-  applyOrDismissById(errorId, "apply");
-  return;
-}
-
-  
-if (e.target.closest("[data-dismiss]")) {
-  applyOrDismissById(errorId, "dismiss");
-  return;
-}
-
+  if (e.target.closest("[data-dismiss]")) {
+    applyOrDismissById(errorId, "dismiss");
+    return;
+  }
+});
     });
   
     function removeSidebarItemById(errorId) {
