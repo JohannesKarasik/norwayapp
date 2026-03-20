@@ -1852,8 +1852,8 @@ function restoreHighlightedState() {
   hideTooltip();
   activeError = null;
 
-
   applyLockToUI();
+  applyPreviewLockToExistingSidebar();
   return true;
 }
 
@@ -1914,35 +1914,32 @@ function clearLocks() {
   applyLockToUI();
 }
 
-function applyLockToUI() {
-  const mode = getLockMode(); // auth/pay/null
 
-  const noteText =
-    mode === "auth"
-      ? "Opprett konto for å låse opp forslaget"
-      : "Start gratis prøve for å låse opp forslaget";
+function applyPreviewLockToExistingSidebar() {
+  if (!suggestionsList) return;
 
-  const lockedBtnText =
-    mode === "auth"
-      ? "Opprett konto for å se rettelser"
-      : "Start gratis prøve for å se korreksjoner";
+  const shouldPreviewLock = !window.IS_PAYING;
 
-  const lockedBtnAttr =
-    mode === "auth" ? "data-unlock-auth" : "data-unlock-pay";
+  suggestionsList.querySelectorAll(".s-item").forEach((li, index) => {
+    const isPreviewLocked = shouldPreviewLock && index >= FREE_PREVIEW_LIMIT;
 
-  suggestionsList?.querySelectorAll(".s-item").forEach((li) => {
-    li.classList.toggle("is-locked", !!mode);
+    li.classList.toggle("is-locked", isPreviewLocked);
 
-    // lock note
-   
+    const jumpBtn = li.querySelector(".s-jump");
+    if (jumpBtn) {
+      if (isPreviewLocked) {
+        jumpBtn.setAttribute("data-preview-locked", "true");
+      } else {
+        jumpBtn.removeAttribute("data-preview-locked");
+      }
+    }
 
-    // ✅ NEW: swap action buttons depending on lock mode
     const actions = li.querySelector(".s-actions");
     if (actions) {
-      if (mode) {
+      if (isPreviewLocked) {
         actions.innerHTML = `
-          <button type="button" class="s-btn s-btn--primary" ${lockedBtnAttr}>
-            ${escapeHTML(lockedBtnText)}
+          <button type="button" class="s-btn s-btn--primary" data-unlock-preview>
+            Opprett konto for å se alle feilene
           </button>
         `;
       } else {
@@ -1953,6 +1950,37 @@ function applyLockToUI() {
       }
     }
   });
+}
+
+function applyLockToUI() {
+  const mode = getLockMode(); // auth/pay/null
+
+  // Always re-apply the 3-visible preview lock first
+  applyPreviewLockToExistingSidebar();
+
+  const lockedBtnText =
+    mode === "auth"
+      ? "Opprett konto for å se rettelser"
+      : "Start gratis prøve for å se korreksjoner";
+
+  const lockedBtnAttr =
+    mode === "auth" ? "data-unlock-auth" : "data-unlock-pay";
+
+  // Only override actions if there is an actual auth/pay lock mode
+  if (mode) {
+    suggestionsList?.querySelectorAll(".s-item").forEach((li) => {
+      li.classList.add("is-locked");
+
+      const actions = li.querySelector(".s-actions");
+      if (actions) {
+        actions.innerHTML = `
+          <button type="button" class="s-btn s-btn--primary" ${lockedBtnAttr}>
+            ${escapeHTML(lockedBtnText)}
+          </button>
+        `;
+      }
+    });
+  }
 
   // Tooltip blur/unblur
   const tp = window.__tcTooltip;
@@ -1961,7 +1989,7 @@ function applyLockToUI() {
     toEl.classList.toggle("tc-tip__to--blur", !!mode);
   }
 
-  // ✅ NEW: swap tooltip buttons too (if tooltip is open)
+  // Tooltip actions
   const tpActions = tp?.querySelector(".tc-tip__actions");
   if (tpActions) {
     if (mode) {
@@ -1971,7 +1999,7 @@ function applyLockToUI() {
           ${escapeHTML(lockedBtnText)}
         </button>
       `;
-    } else {
+    } else if (activeError) {
       tpActions.innerHTML = `
         <button type="button" class="tc-tip__btn tc-tip__btn--primary apply">Bruk</button>
         <button type="button" class="tc-tip__btn dismiss">Avvis</button>
@@ -1979,7 +2007,6 @@ function applyLockToUI() {
     }
   }
 }
-
 
 // Expose for modal close handlers (outside the IIFE)
 window.__tcApplyPendingLock = applyPendingLock;
