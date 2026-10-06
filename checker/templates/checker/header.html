@@ -14,10 +14,6 @@
       {% if user.is_authenticated %}
         <a class="header-link header-link--settings" href="{% url 'settings' %}">Innstillinger</a>
 
-        <!-- Kontakt (hidden on mobile) -->
-        <button type="button" class="header-link header-link--button header-link--contact" onclick="openContactModal()">
-          Kontakt
-        </button>
 
       {% else %}
         <!-- Logged out: show nothing on mobile (and we hide these on mobile via CSS below) -->
@@ -31,6 +27,10 @@
           Opprett konto
         </button>
       {% endif %}
+
+      <button type="button" class="header-link header-link--button header-link--contact" onclick="openContactModal()">
+        Kontakt
+      </button>
     </div>
   </div>
 
@@ -152,7 +152,8 @@
     }
 
     /* Only show the settings link (and this only exists when authenticated) */
-    .header-actions .header-link--settings {
+    .header-actions .header-link--settings,
+    .header-actions .header-link--contact {
       display: inline-flex !important;
       align-items: center;
     }
